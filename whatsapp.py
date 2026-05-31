@@ -11,9 +11,20 @@ API_URL = "https://7107.api.greenapi.com"
 def format_phone_number(phone):
     """Garante que o telefone tem apenas números e adiciona @c.us"""
     clean_phone = ''.join(filter(str.isdigit, phone))
+    
     # Se por algum motivo o usuário não preencheu o 55 da máscara, adiciona
     if not clean_phone.startswith('55'):
         clean_phone = '55' + clean_phone
+        
+    # Extrai o DDD e aplica a regra do 9º dígito
+    if len(clean_phone) >= 12:
+        ddd = int(clean_phone[2:4])
+        numero = clean_phone[4:]
+        
+        # Se DDD > 28 e o número tem 9 dígitos começando com 9, remove o 9
+        if ddd > 28 and len(numero) == 9 and numero.startswith('9'):
+            clean_phone = f"55{ddd:02d}{numero[1:]}"
+            
     return f"{clean_phone}@c.us"
 
 def send_message(phone, text):
