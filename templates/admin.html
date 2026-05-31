@@ -116,16 +116,19 @@
         </div>
 
         <!-- LISTA DE INSCRITOS -->
-        <div class="flex justify-between items-end mb-6">
+        <div class="flex flex-col sm:flex-row sm:justify-between sm:items-end gap-4 mb-6">
             <h2 class="text-2xl font-bold text-gray-900">👥 Inscritos Recentes</h2>
-            <a href="{{ url_for('main.exportar_pdf') }}" class="inline-flex items-center px-4 py-2 bg-gray-800 text-white text-sm font-medium rounded-lg hover:bg-gray-900 shadow-sm transition">
-                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
-                Baixar Relatório PDF
-            </a>
+            <div class="flex space-x-4 items-center">
+                <input type="text" id="searchInput" onkeyup="filterTable()" placeholder="Pesquisar por nome..." class="px-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500 min-w-[250px]">
+                <a href="{{ url_for('main.exportar_pdf') }}" class="inline-flex items-center px-4 py-2 bg-gray-800 text-white text-sm font-medium rounded-lg hover:bg-gray-900 shadow-sm transition">
+                    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                    Baixar Relatório PDF
+                </a>
+            </div>
         </div>
         <div class="bg-white shadow-sm border border-gray-200 rounded-2xl overflow-hidden">
             <div class="overflow-x-auto">
-                <table class="min-w-full divide-y divide-gray-200">
+                <table id="inscritosTable" class="min-w-full divide-y divide-gray-200">
                     <thead class="bg-gray-50">
                         <tr>
                             <th scope="col" class="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">ID / Data</th>
@@ -145,7 +148,7 @@
                             <td class="px-6 py-4">
                                 <div class="text-sm font-bold text-gray-900">{{ i.nome_completo }}</div>
                                 <div class="text-sm text-gray-600">& {{ i.nome_conjuge }}</div>
-                                <a href="https://wa.me/{{ i.telefone|replace('+', '')|replace(' ', '')|replace('-', '') }}" target="_blank" class="inline-flex items-center mt-2 text-xs font-semibold text-green-600 hover:text-green-800 transition bg-green-50 px-2 py-1 rounded-md">
+                                <a href="https://wa.me/{{ i.telefone|replace('+', '')|replace(' ', '')|replace('-', '')|replace('(', '')|replace(')', '') }}" target="_blank" class="inline-flex items-center mt-2 text-xs font-semibold text-green-600 hover:text-green-800 transition bg-green-50 px-2 py-1 rounded-md">
                                     <svg class="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 24 24"><path d="M12 0a12 12 0 1012 12A12.013 12.013 0 0012 0zm6.812 16.924a3.195 3.195 0 01-2.204 1.488c-1.378.13-4.302-1.04-8.03-4.767-3.727-3.727-4.896-6.65-4.766-8.028a3.2 3.2 0 011.488-2.205 1.5 1.5 0 011.594.133l2.25 1.5a1.5 1.5 0 01.624 1.34c-.035.433-.284.82-.676 1.05l-1.076.634a.75.75 0 00-.317.842 10.354 10.354 0 004.836 4.836.75.75 0 00.842-.317l.634-1.076a1.5 1.5 0 011.05-.676 1.5 1.5 0 011.34.624l1.5 2.25a1.5 1.5 0 01.134 1.594z"/></svg>
                                     {{ i.telefone }}
                                 </a>
@@ -210,5 +213,27 @@
         
     </div>
 
+    <script>
+        function filterTable() {
+            var input, filter, table, tr, td, i, txtValue;
+            input = document.getElementById("searchInput");
+            filter = input.value.toUpperCase();
+            table = document.getElementById("inscritosTable");
+            tr = table.getElementsByTagName("tr");
+            
+            // Loop through all table rows, and hide those who don't match the search query
+            for (i = 1; i < tr.length; i++) { // Skip the header row (i=0)
+                td = tr[i].getElementsByTagName("td")[1]; // Index 1 is the "Casal / Contato" column
+                if (td) {
+                    txtValue = td.textContent || td.innerText;
+                    if (txtValue.toUpperCase().indexOf(filter) > -1) {
+                        tr[i].style.display = "";
+                    } else {
+                        tr[i].style.display = "none";
+                    }
+                }
+            }
+        }
+    </script>
 </body>
 </html>
