@@ -13,10 +13,15 @@
             overflow: hidden; /* Evita rolagem na página inteira */
         }
         .bg-img {
-            background-image: url('{{ url_for("static", filename="jantar-de-casais.png") }}');
+            background-image: url('{{ url_for("static", filename="jantar-de-casais-cell.png") }}');
             background-size: cover;
             background-position: center;
             background-repeat: no-repeat;
+        }
+        @media (min-width: 768px) {
+            .bg-img {
+                background-image: url('{{ url_for("static", filename="jantar-de-casais.png") }}');
+            }
         }
         
         /* Drawer styling */
@@ -129,11 +134,12 @@
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
                     <div>
                         <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">WhatsApp</label>
-                        <input type="text" id="telefone" name="telefone" required placeholder="+55 (11) 90000-0000" class="w-full px-4 py-3 clean-input rounded-xl text-base font-medium">
+                        <input type="text" id="telefone" name="telefone" class="w-full px-4 py-3 clean-input rounded-xl text-base font-medium" placeholder="+55 (83) 8888-8888" required>
+                        <p class="text-[10px] text-gray-400 mt-1 italic">* Não inclua o 9º dígito (ex: 8888-8888).</p>
                     </div>
                     <div>
-                        <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Data Casamento</label>
-                        <input type="date" name="data_casamento" required class="w-full px-4 py-3 clean-input rounded-xl text-base font-medium">
+                        <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Data de Casamento</label>
+                        <input type="date" name="data_casamento" class="w-full px-4 py-3 clean-input rounded-xl text-base font-medium" required>
                     </div>
                 </div>
 
@@ -217,12 +223,14 @@
         }
 
         // Máscaras
-        IMask(document.getElementById('telefone'), {
-            mask: '+55 (00) 00000-0000'
-        });
-        
-        IMask(document.getElementById('cpf_responsavel'), {
-            mask: '000.000.000-00'
+        document.addEventListener('DOMContentLoaded', function() {
+            const phoneInput = document.getElementById('telefone');
+            IMask(phoneInput, {
+                mask: '+55 (00) 0000-0000'
+            });
+            IMask(document.getElementById('cpf_responsavel'), {
+                mask: '000.000.000-00'
+            });
         });
 
         function updateForm() {
