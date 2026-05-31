@@ -134,8 +134,8 @@
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
                     <div>
                         <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">WhatsApp</label>
-                        <input type="text" id="telefone" name="telefone" class="w-full px-4 py-3 clean-input rounded-xl text-base font-medium" placeholder="+55 (83) 8888-8888" required>
-                        <p class="text-[10px] text-gray-400 mt-1 italic">* Não inclua o 9º dígito (ex: 8888-8888).</p>
+                        <input type="text" id="telefone" name="telefone" class="w-full px-4 py-3 clean-input rounded-xl text-base font-medium" placeholder="+55 (83) 98888-8888" required>
+                        <p class="text-[10px] text-gray-400 mt-1 italic">* Digite o seu WhatsApp, incluindo o 9º dígito se houver.</p>
                     </div>
                     <div>
                         <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Data de Casamento</label>
@@ -226,7 +226,10 @@
         document.addEventListener('DOMContentLoaded', function() {
             const phoneInput = document.getElementById('telefone');
             IMask(phoneInput, {
-                mask: '+55 (00) 0000-0000'
+                mask: [
+                    { mask: '+55 (00) 0000-0000' },
+                    { mask: '+55 (00) 00000-0000' }
+                ]
             });
             IMask(document.getElementById('cpf_responsavel'), {
                 mask: '000.000.000-00'
