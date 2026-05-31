@@ -55,3 +55,25 @@ def send_image_by_url(phone, image_url, caption=""):
     except Exception as e:
         print(f"Erro ao enviar QR Code WhatsApp para {phone}: {e}")
         return None
+
+def send_file_by_upload(phone, file_bytes, filename, caption=""):
+    url = f"{API_URL}/waInstance{ID_INSTANCE}/sendFileByUpload/{API_TOKEN_INSTANCE}"
+    
+    payload = {
+        "chatId": format_phone_number(phone),
+        "caption": caption
+    }
+    
+    # file_bytes is a bytes-like object
+    files = {
+        "file": (filename, file_bytes, "application/pdf")
+    }
+    
+    try:
+        # requests uses multipart/form-data automatically when files= is provided
+        response = requests.post(url, data=payload, files=files)
+        response.raise_for_status()
+        return response.json()
+    except Exception as e:
+        print(f"Erro ao fazer upload de arquivo para {phone}: {e}")
+        return None

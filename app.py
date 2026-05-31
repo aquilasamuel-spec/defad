@@ -50,6 +50,8 @@ def create_app():
             msg += f"Este é um lembrete amigável de que a sua parcela {p.numero_parcela} (R$ {p.valor_parcela:.2f}) do Jantar de Casais DEFAD vence *hoje*.\n\n"
             msg += "Abaixo está a chave PIX Copia e Cola. O QR Code também será enviado na próxima mensagem.\n\n"
             msg += f"`{p.chave_pix_copia_cola}`\n\n"
+            msg += "Após realizar o pagamento, *envie e guarde o comprovante* enviando para o WhatsApp oficial:\n"
+            msg += "📲 wa.me/558382069331\n\n"
             msg += "Se já efetuou o pagamento, por favor desconsidere esta mensagem."
             
             # Envia mensagem de texto

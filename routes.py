@@ -134,19 +134,93 @@ def inscrever():
     db.session.commit()
 
     try:
-        from whatsapp import send_message
-        msg = f"Olá, *{nome_completo}*!\n\nRecebemos a solicitação de inscrição para o *Jantar de Casais DEFAD*.\n\n"
-        msg += f"Inscrição: {tipo_inscricao.replace('_', ' + ').title()}\n"
-        msg += f"Valor Total: R$ {valor_total:.2f}\n\n"
+        from whatsapp import send_message, send_file_by_upload
+        from fpdf import FPDF
+        import io
         
-        if qtd_parcelas == 1:
-            msg += f"Pagamento: À vista (1x de R$ {valor_parcela:.2f})\n"
-        else:
-            msg += f"Pagamento: Parcelado em {qtd_parcelas}x de R$ {valor_parcela:.2f}\n"
+        # Gerar o PDF de Comprovante de Solicitação
+        class ReceiptPDF(FPDF):
+            def header(self):
+                self.set_font("helvetica", "B", 20)
+                self.set_text_color(0, 150, 0)
+                self.cell(0, 15, "Inscrição Realizada com Sucesso!", new_x="LMARGIN", new_y="NEXT", align="C")
+                self.set_font("helvetica", "", 12)
+                self.set_text_color(100, 100, 100)
+                self.cell(0, 10, f"Obrigado, {nome_completo}. Sua vaga está reservada.", new_x="LMARGIN", new_y="NEXT", align="C")
+                self.ln(10)
+                self.set_draw_color(220, 220, 220)
+                self.line(10, self.get_y(), 200, self.get_y())
+                self.ln(10)
+
+        pdf = ReceiptPDF()
+        pdf.add_page()
+        
+        # Resumo da Inscrição
+        pdf.set_font("helvetica", "B", 14)
+        pdf.set_text_color(20, 30, 50)
+        pdf.cell(0, 10, "Resumo da Inscrição", new_x="LMARGIN", new_y="NEXT")
+        pdf.ln(2)
+        
+        pdf.set_font("helvetica", "", 10)
+        pdf.set_text_color(120, 120, 120)
+        pdf.cell(90, 6, "Tipo", new_x="RIGHT")
+        pdf.cell(90, 6, "Cônjuge", new_x="LMARGIN", new_y="NEXT")
+        
+        pdf.set_font("helvetica", "", 11)
+        pdf.set_text_color(20, 30, 50)
+        pdf.cell(90, 8, tipo_inscricao.replace('_', ' + ').title(), new_x="RIGHT")
+        pdf.cell(90, 8, nome_conjuge, new_x="LMARGIN", new_y="NEXT")
+        pdf.ln(5)
+        
+        pdf.set_font("helvetica", "", 10)
+        pdf.set_text_color(120, 120, 120)
+        pdf.cell(90, 6, "Status Geral", new_x="LMARGIN", new_y="NEXT")
+        
+        pdf.set_font("helvetica", "B", 11)
+        pdf.set_text_color(200, 150, 0) # Pendente amarelado
+        pdf.cell(90, 8, "Pendente", new_x="LMARGIN", new_y="NEXT")
+        pdf.ln(10)
+        
+        pdf.set_draw_color(220, 220, 220)
+        pdf.line(10, pdf.get_y(), 200, pdf.get_y())
+        pdf.ln(10)
+        
+        # Plano de Pagamento
+        pdf.set_font("helvetica", "B", 14)
+        pdf.set_text_color(20, 30, 50)
+        pdf.cell(0, 10, "Plano de Pagamento", new_x="LMARGIN", new_y="NEXT")
+        pdf.ln(5)
+        
+        # Tabela cabeçalho
+        pdf.set_font("helvetica", "B", 10)
+        pdf.set_text_color(20, 30, 50)
+        pdf.cell(30, 10, "Parcela", border="T", align="C")
+        pdf.cell(50, 10, "Vencimento", border="T", align="C")
+        pdf.cell(50, 10, "Valor", border="T", align="C")
+        pdf.cell(50, 10, "Status", border="T", align="C", new_x="LMARGIN", new_y="NEXT")
+        
+        # Tabela linhas
+        pdf.set_font("helvetica", "", 10)
+        pdf.set_text_color(100, 100, 100)
+        for i, parc in enumerate(nova_inscricao.parcelas):
+            pdf.cell(30, 10, f"{i+1}x", border="T", align="C")
+            pdf.cell(50, 10, parc.data_vencimento.strftime("%d/%m/%Y"), border="T", align="C")
+            pdf.cell(50, 10, f"R$ {parc.valor_parcela:.2f}", border="T", align="C")
+            pdf.cell(50, 10, "Pendente", border="T", align="C", new_x="LMARGIN", new_y="NEXT")
             
+        pdf_bytes = pdf.output(dest='S')
+        
+        # Mensagem Texto
+        msg = f"Olá, *{nome_completo}*!\n\nRecebemos a solicitação de inscrição para o *Jantar de Casais DEFAD*.\n\n"
         msg += "\n*Importante:* A sua inscrição só será de fato efetivada quando realizar o pagamento por completo.\n\n"
+        msg += "Após realizar o pagamento, *envie e guarde o comprovante de pagamento* enviando para o WhatsApp oficial do evento:\n"
+        msg += "📲 wa.me/558382069331\n\n"
+        msg += "Segue em anexo o *Comprovante de Solicitação* com o resumo e plano de pagamento.\n"
         msg += "Verifique a tela do site para realizar o pagamento, ou aguarde nossas cobranças com o PIX Copia e Cola!"
         
+        # Envia PDF primeiro
+        send_file_by_upload(telefone, bytes(pdf_bytes), "Comprovante_Solicitacao.pdf", "Resumo da Inscrição")
+        # Envia Mensagem de texto
         send_message(telefone, msg)
     except Exception as e:
         print("Erro ao enviar WhatsApp de Solicitação:", e)
@@ -226,15 +300,66 @@ def pagar_parcela(id):
     if len(pagas) == len(todas_parcelas):
         inscricao.status_geral = 'Pago Total'
         try:
-            from whatsapp import send_message
-            msg_comprovante = f"🎉 *COMPROVANTE DE INSCRIÇÃO REALIZADA* 🎉\n\nOlá, {inscricao.nome_completo}!\nO pagamento total da sua inscrição no Jantar de Casais DEFAD foi confirmado!\nSua vaga está garantida. Nos vemos lá!"
-            send_message(inscricao.telefone, msg_comprovante)
+            from whatsapp import send_message, send_file_by_upload
+            from fpdf import FPDF
+            import io
+            
+            # Gerar o PDF de Comprovante de Inscrição Efetivada (Ticket)
+            class TicketPDF(FPDF):
+                def header(self):
+                    self.set_font("helvetica", "B", 22)
+                    self.set_text_color(255, 140, 0) # Laranja
+                    self.cell(0, 15, "INSCRIÇÃO EFETIVADA COM SUCESSO!", new_x="LMARGIN", new_y="NEXT", align="C")
+                    self.set_font("helvetica", "", 12)
+                    self.set_text_color(100, 100, 100)
+                    self.cell(0, 10, "Este é o seu COMPROVANTE OFICIAL PARA ENTRADA NO EVENTO.", new_x="LMARGIN", new_y="NEXT", align="C")
+                    self.ln(10)
+                    self.set_draw_color(255, 140, 0)
+                    self.set_line_width(1)
+                    self.line(10, self.get_y(), 200, self.get_y())
+                    self.ln(10)
+
+            pdf = TicketPDF()
+            pdf.add_page()
+            
+            # Detalhes do Ingresso
+            pdf.set_font("helvetica", "B", 16)
+            pdf.set_text_color(20, 30, 50)
+            pdf.cell(0, 10, "Detalhes do Casal", new_x="LMARGIN", new_y="NEXT", align="C")
+            pdf.ln(5)
+            
+            pdf.set_font("helvetica", "B", 14)
+            pdf.cell(0, 8, f"Responsável: {inscricao.nome_completo}", new_x="LMARGIN", new_y="NEXT", align="C")
+            pdf.cell(0, 8, f"Cônjuge: {inscricao.nome_conjuge}", new_x="LMARGIN", new_y="NEXT", align="C")
+            
+            pdf.ln(10)
+            pdf.set_font("helvetica", "", 12)
+            pdf.set_text_color(100, 100, 100)
+            pdf.cell(0, 8, f"Produto Adquirido: {inscricao.tipo_inscricao.replace('_', ' + ').title()}", new_x="LMARGIN", new_y="NEXT", align="C")
+            pdf.cell(0, 8, f"Status do Pagamento: PAGO TOTAL", new_x="LMARGIN", new_y="NEXT", align="C")
+            
+            pdf_bytes = pdf.output(dest='S')
+            
+            msg = f"🎉 *COMPROVANTE DE INSCRIÇÃO REALIZADA* 🎉\n\nOlá, {inscricao.nome_completo}!\nO pagamento total da sua inscrição no Jantar de Casais DEFAD foi confirmado!\n\nSua vaga está garantida. Nos vemos lá!\n\n*Atenção:* O PDF anexo é o seu comprovante oficial para entrada no evento."
+            
+            send_file_by_upload(inscricao.telefone, bytes(pdf_bytes), "Comprovante_Ingresso_DEFAD.pdf", "Ingresso do Evento")
+            send_message(inscricao.telefone, msg)
         except Exception as e:
             print("Erro ao enviar Comprovante WhatsApp:", e)
             
     elif len(pagas) > 0:
         inscricao.status_geral = 'Pago Parcial'
-        
+        try:
+            from whatsapp import send_message
+            msg = f"Olá, {inscricao.nome_completo}!\nConfirmamos o pagamento da parcela {parcela.numero_parcela}.\n\n*Resumo das Parcelas:*\n"
+            for p in todas_parcelas:
+                icone = "✅" if p.status_parcela == "Pago" else "⏳"
+                msg += f"{icone} {p.numero_parcela}x - R$ {p.valor_parcela:.2f} ({p.status_parcela})\n"
+            msg += "\nObrigado!"
+            send_message(inscricao.telefone, msg)
+        except Exception as e:
+            print("Erro ao enviar recibo parcial WhatsApp:", e)
+            
     db.session.commit()
     
     flash(f'Parcela {parcela.numero_parcela} de {inscricao.nome_completo} confirmada!', 'success')
