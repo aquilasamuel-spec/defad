@@ -497,8 +497,10 @@ def editar_inscricao(id):
             pass
 
     novo_tipo_inscricao = request.form.get('tipo_inscricao')
+    refazer_pagamento = request.form.get('refazer_pagamento') == 'on'
     
     if novo_tipo_inscricao and novo_tipo_inscricao != inscricao.tipo_inscricao:
+        refazer_pagamento = True
         old_produto = Produto.query.filter_by(nome=inscricao.tipo_inscricao).first()
         new_produto = Produto.query.filter_by(nome=novo_tipo_inscricao).first()
         
@@ -508,6 +510,10 @@ def editar_inscricao(id):
         if new_produto:
             new_produto.vagas_ocupadas += 1
             inscricao.tipo_inscricao = new_produto.nome
+
+    if refazer_pagamento:
+        new_produto = Produto.query.filter_by(nome=inscricao.tipo_inscricao).first()
+        if new_produto:
             inscricao.status_geral = 'Pendente'
             
             # Deletar parcelas antigas
@@ -620,7 +626,7 @@ def editar_inscricao(id):
                 pdf_bytes = pdf.output(dest='S')
                 
                 msg = f"Olá, *{inscricao.nome_completo}*!\n\nA administração do *Jantar de Casais DEFAD* atualizou a sua inscrição.\n\n"
-                msg += f"O novo tipo de ingresso é: *{inscricao.tipo_inscricao}*.\n"
+                msg += f"O seu ingresso é: *{inscricao.tipo_inscricao}*.\n"
                 msg += "As parcelas e pagamentos foram recalculados conforme o novo plano escolhido.\n\n"
                 msg += "Segue em anexo o *Comprovante Atualizado* com o novo resumo e plano de pagamento.\n"
                 msg += "Verifique a tela do site ou aguarde nossas cobranças com o PIX Copia e Cola!"
