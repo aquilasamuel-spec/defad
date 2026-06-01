@@ -286,12 +286,16 @@ def admin():
     parcelas_pendentes = ParcelaPagamento.query.filter_by(status_parcela='Pendente').all()
     valor_a_receber = sum(p.valor_parcela for p in parcelas_pendentes)
     
+    max_parcelas = get_max_parcelas()
+    meses_disponiveis = list(range(1, max_parcelas + 1))
+    
     return render_template('admin.html', 
                            inscricoes=inscricoes, 
                            produtos=produtos,
                            total_inscritos=total_inscritos,
                            valor_arrecadado=valor_arrecadado,
-                           valor_a_receber=valor_a_receber)
+                           valor_a_receber=valor_a_receber,
+                           meses_disponiveis=meses_disponiveis)
 
 @bp.route('/admin/produto/editar/<int:id>', methods=['POST'])
 def editar_produto(id):
@@ -491,6 +495,140 @@ def editar_inscricao(id):
             inscricao.data_casamento = datetime.strptime(data_casamento_str, '%Y-%m-%d').date()
         except:
             pass
+
+    novo_tipo_inscricao = request.form.get('tipo_inscricao')
+    
+    if novo_tipo_inscricao and novo_tipo_inscricao != inscricao.tipo_inscricao:
+        old_produto = Produto.query.filter_by(nome=inscricao.tipo_inscricao).first()
+        new_produto = Produto.query.filter_by(nome=novo_tipo_inscricao).first()
+        
+        if old_produto and old_produto.vagas_ocupadas > 0:
+            old_produto.vagas_ocupadas -= 1
+            
+        if new_produto:
+            new_produto.vagas_ocupadas += 1
+            inscricao.tipo_inscricao = new_produto.nome
+            inscricao.status_geral = 'Pendente'
+            
+            # Deletar parcelas antigas
+            ParcelaPagamento.query.filter_by(inscricao_id=inscricao.id).delete()
+            
+            # Criar novas parcelas
+            qtd_parcelas = int(request.form.get('parcelas', 1))
+            dia_vencimento = int(request.form.get('dia_vencimento', 10))
+            valor_total = new_produto.valor
+            valor_parcela = round(valor_total / qtd_parcelas, 2)
+            hoje = date.today()
+            
+            for i in range(qtd_parcelas):
+                mes_vencimento = hoje.month + i
+                ano_vencimento = hoje.year
+                while mes_vencimento > 12:
+                    mes_vencimento -= 12
+                    ano_vencimento += 1
+                try:
+                    data_venc = date(ano_vencimento, mes_vencimento, dia_vencimento)
+                except ValueError:
+                    prox_mes = mes_vencimento + 1
+                    ano_prox = ano_vencimento
+                    if prox_mes > 12:
+                        prox_mes = 1
+                        ano_prox += 1
+                    data_venc = date(ano_prox, prox_mes, 1) - relativedelta(days=1)
+
+                nova_parcela = ParcelaPagamento(
+                    inscricao_id=inscricao.id,
+                    numero_parcela=i+1,
+                    valor_parcela=valor_parcela,
+                    data_vencimento=data_venc,
+                    chave_pix_copia_cola=generate_pix(valor_parcela)
+                )
+                db.session.add(nova_parcela)
+            
+            db.session.commit()
+            
+            # Gerar PDF e enviar notificação via WhatsApp
+            try:
+                from whatsapp import send_message, send_file_by_upload
+                from fpdf import FPDF
+                
+                class ReceiptPDF(FPDF):
+                    def header(self):
+                        self.set_font("helvetica", "B", 20)
+                        self.set_text_color(0, 150, 0)
+                        self.cell(0, 15, "Inscrição Atualizada com Sucesso!", new_x="LMARGIN", new_y="NEXT", align="C")
+                        self.set_font("helvetica", "", 12)
+                        self.set_text_color(100, 100, 100)
+                        self.cell(0, 10, f"Obrigado, {inscricao.nome_completo}. Sua vaga foi atualizada.", new_x="LMARGIN", new_y="NEXT", align="C")
+                        self.ln(10)
+                        self.set_draw_color(220, 220, 220)
+                        self.line(10, self.get_y(), 200, self.get_y())
+                        self.ln(10)
+
+                pdf = ReceiptPDF()
+                pdf.add_page()
+                
+                pdf.set_font("helvetica", "B", 14)
+                pdf.set_text_color(20, 30, 50)
+                pdf.cell(0, 10, "Resumo da Inscrição", new_x="LMARGIN", new_y="NEXT")
+                pdf.ln(2)
+                
+                pdf.set_font("helvetica", "", 10)
+                pdf.set_text_color(120, 120, 120)
+                pdf.cell(90, 6, "Tipo", new_x="RIGHT")
+                pdf.cell(90, 6, "Cônjuge", new_x="LMARGIN", new_y="NEXT")
+                
+                pdf.set_font("helvetica", "", 11)
+                pdf.set_text_color(20, 30, 50)
+                pdf.cell(90, 8, inscricao.tipo_inscricao.replace('_', ' + ').title(), new_x="RIGHT")
+                pdf.cell(90, 8, inscricao.nome_conjuge, new_x="LMARGIN", new_y="NEXT")
+                pdf.ln(5)
+                
+                pdf.set_font("helvetica", "", 10)
+                pdf.set_text_color(120, 120, 120)
+                pdf.cell(90, 6, "Status Geral", new_x="LMARGIN", new_y="NEXT")
+                
+                pdf.set_font("helvetica", "B", 11)
+                pdf.set_text_color(200, 150, 0)
+                pdf.cell(90, 8, "Pendente", new_x="LMARGIN", new_y="NEXT")
+                pdf.ln(10)
+                
+                pdf.set_draw_color(220, 220, 220)
+                pdf.line(10, pdf.get_y(), 200, pdf.get_y())
+                pdf.ln(10)
+                
+                pdf.set_font("helvetica", "B", 14)
+                pdf.set_text_color(20, 30, 50)
+                pdf.cell(0, 10, "Novo Plano de Pagamento", new_x="LMARGIN", new_y="NEXT")
+                pdf.ln(5)
+                
+                pdf.set_font("helvetica", "B", 10)
+                pdf.set_text_color(20, 30, 50)
+                pdf.cell(30, 10, "Parcela", border="T", align="C")
+                pdf.cell(50, 10, "Vencimento", border="T", align="C")
+                pdf.cell(50, 10, "Valor", border="T", align="C")
+                pdf.cell(50, 10, "Status", border="T", align="C", new_x="LMARGIN", new_y="NEXT")
+                
+                pdf.set_font("helvetica", "", 10)
+                pdf.set_text_color(100, 100, 100)
+                for i, parc in enumerate(inscricao.parcelas):
+                    pdf.cell(30, 10, f"{i+1}x", border="T", align="C")
+                    pdf.cell(50, 10, parc.data_vencimento.strftime("%d/%m/%Y"), border="T", align="C")
+                    pdf.cell(50, 10, f"R$ {parc.valor_parcela:.2f}", border="T", align="C")
+                    pdf.cell(50, 10, "Pendente", border="T", align="C", new_x="LMARGIN", new_y="NEXT")
+                    
+                pdf_bytes = pdf.output(dest='S')
+                
+                msg = f"Olá, *{inscricao.nome_completo}*!\n\nA administração do *Jantar de Casais DEFAD* atualizou a sua inscrição.\n\n"
+                msg += f"O novo tipo de ingresso é: *{inscricao.tipo_inscricao}*.\n"
+                msg += "As parcelas e pagamentos foram recalculados conforme o novo plano escolhido.\n\n"
+                msg += "Segue em anexo o *Comprovante Atualizado* com o novo resumo e plano de pagamento.\n"
+                msg += "Verifique a tela do site ou aguarde nossas cobranças com o PIX Copia e Cola!"
+                
+                send_file_by_upload(inscricao.telefone, bytes(pdf_bytes), "Comprovante_Atualizado.pdf", "Resumo da Inscrição Atualizado")
+                send_message(inscricao.telefone, msg)
+            except Exception as e:
+                print("Erro ao enviar WhatsApp de atualização:", e)
             
     db.session.commit()
     flash(f'Inscrição de {inscricao.nome_completo} atualizada com sucesso!', 'success')
