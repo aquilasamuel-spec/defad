@@ -190,7 +190,10 @@
                                     </div>
                                     {% endfor %}
                                 </div>
-                                <div class="mt-4 pt-3 border-t border-gray-100 text-right">
+                                <div class="mt-4 pt-3 border-t border-gray-100 text-right flex justify-end space-x-2">
+                                    <button onclick="openEditModal({{ i.id }}, '{{ i.nome_completo }}', '{{ i.nome_conjuge }}', '{{ i.telefone }}', '{{ i.data_casamento.strftime('%Y-%m-%d') }}', '{{ i.local_congregacao }}')" class="inline-flex items-center text-xs font-semibold text-blue-600 hover:text-blue-800 transition bg-blue-50 hover:bg-blue-100 px-2 py-1 rounded-md">
+                                        Editar
+                                    </button>
                                     <form action="{{ url_for('main.excluir_inscricao', id=i.id) }}" method="POST" class="inline">
                                         <button type="submit" class="inline-flex items-center text-xs font-semibold text-red-600 hover:text-red-800 transition bg-red-50 hover:bg-red-100 px-2 py-1 rounded-md" onclick="return confirm('ATENÇÃO: Tem certeza que deseja excluir esta inscrição? A vaga será devolvida e todos os dados serão perdidos.')">
                                             <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
@@ -213,7 +216,77 @@
         
     </div>
 
+    <!-- Modal de Edição -->
+    <div id="editModal" class="hidden fixed inset-0 z-50 overflow-y-auto" aria-labelledby="modal-title" role="dialog" aria-modal="true">
+        <div class="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+            <div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" aria-hidden="true" onclick="closeEditModal()"></div>
+            <span class="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
+            <div class="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+                <form id="editForm" method="POST" action="">
+                    <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                        <h3 class="text-lg leading-6 font-medium text-gray-900 mb-4" id="modal-title">Editar Inscrição</h3>
+                        <div class="space-y-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700">Nome Completo</label>
+                                <input type="text" name="nome_completo" id="edit_nome_completo" required class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-orange-500 focus:border-orange-500 sm:text-sm">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700">Nome do Cônjuge</label>
+                                <input type="text" name="nome_conjuge" id="edit_nome_conjuge" required class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-orange-500 focus:border-orange-500 sm:text-sm">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700">WhatsApp</label>
+                                <input type="text" name="telefone" id="edit_telefone" required class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-orange-500 focus:border-orange-500 sm:text-sm">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700">Data de Casamento</label>
+                                <input type="date" name="data_casamento" id="edit_data_casamento" required class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-orange-500 focus:border-orange-500 sm:text-sm">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700">Congregação</label>
+                                <select name="local_congregacao" id="edit_local_congregacao" required class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-orange-500 focus:border-orange-500 sm:text-sm">
+                                    <option value="Templo Central">Templo Central</option>
+                                    <option value="Área 1">Área 1</option>
+                                    <option value="Área 2">Área 2</option>
+                                    <option value="Área 3">Área 3</option>
+                                    <option value="Área 4">Área 4</option>
+                                    <option value="Área 5">Área 5</option>
+                                    <option value="Área 6">Área 6</option>
+                                    <option value="Área 7">Área 7</option>
+                                    <option value="Campo">Campo</option>
+                                    <option value="Outra Denominação">Outra Denominação</option>
+                                    <option value="Não Evangélico">Não Evangélico</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+                        <button type="submit" class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-orange-600 text-base font-medium text-white hover:bg-orange-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500 sm:ml-3 sm:w-auto sm:text-sm">
+                            Salvar
+                        </button>
+                        <button type="button" onclick="closeEditModal()" class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm">
+                            Cancelar
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
     <script>
+        function openEditModal(id, nome_completo, nome_conjuge, telefone, data_casamento, local_congregacao) {
+            document.getElementById('editForm').action = "/admin/editar_inscricao/" + id;
+            document.getElementById('edit_nome_completo').value = nome_completo;
+            document.getElementById('edit_nome_conjuge').value = nome_conjuge;
+            document.getElementById('edit_telefone').value = telefone;
+            document.getElementById('edit_data_casamento').value = data_casamento;
+            document.getElementById('edit_local_congregacao').value = local_congregacao;
+            document.getElementById('editModal').classList.remove('hidden');
+        }
+        function closeEditModal() {
+            document.getElementById('editModal').classList.add('hidden');
+        }
+
         function filterTable() {
             var input, filter, table, tr, td, i, txtValue;
             input = document.getElementById("searchInput");
