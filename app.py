@@ -1,3 +1,10 @@
+import os
+import time
+
+os.environ['TZ'] = 'America/Sao_Paulo'
+if hasattr(time, 'tzset'):
+    time.tzset()
+
 from flask import Flask
 from models import db
 from routes import bp
@@ -6,7 +13,6 @@ def create_app():
     import os
     app = Flask(__name__)
     app.config['SECRET_KEY'] = 'defad_secreto_2026'
-    
     # Se estiver rodando no Render (com persistent disk mapeado em /data)
     if os.environ.get('RENDER'):
         app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:////data/database.db'

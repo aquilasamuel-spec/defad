@@ -84,6 +84,28 @@ def inscrever():
     if not produto or produto.vagas_disponiveis <= 0:
         return "Desculpe, as vagas para esta opção estão esgotadas.", 400
 
+    # Validador por telefone
+    inscricao_existente = Inscricao.query.filter_by(telefone=telefone).first()
+    if inscricao_existente:
+        return """
+        <html>
+        <head>
+            <title>Erro na Inscrição</title>
+            <script src="https://cdn.tailwindcss.com"></script>
+        </head>
+        <body class="bg-gray-100 h-screen flex items-center justify-center">
+            <div class="bg-white p-8 rounded-xl shadow-md text-center max-w-md w-full">
+                <svg class="w-16 h-16 text-red-500 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
+                <h2 class="text-2xl font-bold text-gray-800 mb-2">Telefone já cadastrado</h2>
+                <p class="text-gray-600 mb-6">Este número de WhatsApp já possui uma inscrição. Por favor, volte e substitua o telefone.</p>
+                <button onclick="window.history.back()" class="w-full bg-orange-500 hover:bg-orange-600 text-white font-bold py-3 px-4 rounded-lg transition duration-200">
+                    Voltar e Corrigir
+                </button>
+            </div>
+        </body>
+        </html>
+        """, 400
+
     produto.vagas_ocupadas += 1
 
     nova_inscricao = Inscricao(
@@ -449,4 +471,27 @@ def excluir_inscricao(id):
     db.session.commit()
     
     flash(f"Inscrição de {inscricao.nome_completo} excluída com sucesso. A vaga foi devolvida ao estoque.", "success")
+    return redirect(url_for('main.admin'))
+
+@bp.route('/admin/editar_inscricao/<int:id>', methods=['POST'])
+def editar_inscricao(id):
+    if not session.get('admin_logged_in'):
+        return redirect(url_for('main.admin_login'))
+        
+    inscricao = Inscricao.query.get_or_404(id)
+    
+    inscricao.nome_completo = request.form.get('nome_completo')
+    inscricao.nome_conjuge = request.form.get('nome_conjuge')
+    inscricao.telefone = request.form.get('telefone')
+    inscricao.local_congregacao = request.form.get('local_congregacao')
+    
+    data_casamento_str = request.form.get('data_casamento')
+    if data_casamento_str:
+        try:
+            inscricao.data_casamento = datetime.strptime(data_casamento_str, '%Y-%m-%d').date()
+        except:
+            pass
+            
+    db.session.commit()
+    flash(f'Inscrição de {inscricao.nome_completo} atualizada com sucesso!', 'success')
     return redirect(url_for('main.admin'))
