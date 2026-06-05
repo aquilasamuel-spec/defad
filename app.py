@@ -32,6 +32,15 @@ def create_app():
     with app.app_context():
         db.create_all()
         
+        # Adiciona a nova coluna no banco caso ainda não exista (Garante que no Render vai atualizar automático)
+        try:
+            db.session.execute(db.text("ALTER TABLE inscricao ADD COLUMN data_ultima_cobranca DATE;"))
+            db.session.commit()
+            print("Coluna 'data_ultima_cobranca' adicionada com sucesso.")
+        except Exception as e:
+            # Se der erro, é porque a coluna já existe, então ignoramos.
+            db.session.rollback()
+
         # Seeding inicial de produtos
         from models import Produto
         if not Produto.query.filter_by(identificador='jantar').first():
@@ -65,17 +74,21 @@ def create_app():
             else:
                 msg += f"Consta em nosso sistema que a sua parcela {p.numero_parcela} (R$ {p.valor_parcela:.2f}) do Jantar de Casais DEFAD está *pendente* e venceu em {p.data_vencimento.strftime('%d/%m/%Y')}.\n\n"
                 
-            msg += "Abaixo está a chave PIX Copia e Cola. O QR Code também será enviado na próxima mensagem.\n\n"
-            msg += f"`{p.chave_pix_copia_cola}`\n\n"
             msg += "Após realizar o pagamento, *envie e guarde o comprovante* enviando para o WhatsApp oficial:\n"
             msg += "📲 wa.me/558382069331\n\n"
-            msg += "Se já efetuou o pagamento, por favor desconsidere esta mensagem."
+            msg += "Se já efetuou o pagamento, por favor desconsidere esta mensagem.\n\n"
+            msg += "O QR Code e a chave PIX Copia e Cola serão enviados logo abaixo para facilitar o pagamento!"
             
             send_message(telefone, msg)
+            send_message(telefone, p.chave_pix_copia_cola)
             
             pix_encoded = urllib.parse.quote(p.chave_pix_copia_cola)
             qr_url = f"https://api.qrserver.com/v1/create-qr-code/?size=300x300&data={pix_encoded}"
             send_image_by_url(telefone, qr_url, "QR Code para Pagamento")
+            
+            inscricao.data_ultima_cobranca = hoje
+            from models import db
+            db.session.commit()
             
             print(f"Cobrança enviada para {inscricao.nome_completo} ({telefone})")
 

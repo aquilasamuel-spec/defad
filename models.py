@@ -26,6 +26,7 @@ class Inscricao(db.Model):
     cpf_responsavel = db.Column(db.String(20), nullable=True)
     status_geral = db.Column(db.String(50), default='Pendente') # 'Pendente', 'Pago Parcial', 'Pago Total'
     data_inscricao = db.Column(db.DateTime, default=datetime.utcnow)
+    data_ultima_cobranca = db.Column(db.Date, nullable=True)
 
     parcelas = db.relationship('ParcelaPagamento', backref='inscricao', lazy=True, cascade="all, delete-orphan")
 

@@ -240,14 +240,14 @@ def inscrever():
         msg += "Segue em anexo o *Comprovante de Solicitação* com o resumo e plano de pagamento.\n"
         
         primeira_parcela = nova_inscricao.parcelas[0]
-        msg += "\nPara adiantar, segue abaixo a chave PIX Copia e Cola da sua 1ª parcela (ou parcela única):\n\n"
-        msg += f"`{primeira_parcela.chave_pix_copia_cola}`\n\n"
-        msg += "O QR Code também será enviado na próxima mensagem!"
+        msg += "\nPara adiantar, o QR Code e a chave PIX Copia e Cola da sua 1ª parcela (ou parcela única) serão enviados nas próximas mensagens para facilitar a cópia!"
         
         # Envia PDF primeiro
         send_file_by_upload(telefone, bytes(pdf_bytes), "Comprovante_Solicitacao.pdf", "Resumo da Inscrição")
         # Envia Mensagem de texto
         send_message(telefone, msg)
+        # Envia PIX isolado
+        send_message(telefone, primeira_parcela.chave_pix_copia_cola)
         
         # Envia Imagem QR Code
         from whatsapp import send_image_by_url
@@ -306,7 +306,8 @@ def admin():
                            total_inscritos=total_inscritos,
                            valor_arrecadado=valor_arrecadado,
                            valor_a_receber=valor_a_receber,
-                           meses_disponiveis=meses_disponiveis)
+                           meses_disponiveis=meses_disponiveis,
+                           hoje=date.today())
 
 @bp.route('/admin/produto/editar/<int:id>', methods=['POST'])
 def editar_produto(id):
@@ -400,6 +401,49 @@ def pagar_parcela(id):
     db.session.commit()
     
     flash(f'Parcela {parcela.numero_parcela} de {inscricao.nome_completo} confirmada!', 'success')
+    return redirect(url_for('main.admin'))
+
+@bp.route('/admin/cobrar_manual/<int:id>', methods=['POST'])
+def cobrar_manual(id):
+    if not session.get('admin_logged_in'):
+        return redirect(url_for('main.admin_login'))
+        
+    inscricao = Inscricao.query.get_or_404(id)
+    
+    # Pega parcelas pendentes
+    parcelas = [p for p in inscricao.parcelas if p.status_parcela == 'Pendente']
+    if not parcelas:
+        flash(f'Inscrição de {inscricao.nome_completo} não tem parcelas pendentes.', 'error')
+        return redirect(url_for('main.admin'))
+        
+    p = parcelas[0] # cobra a próxima pendente
+    telefone = inscricao.telefone
+    
+    msg = f"Olá, *{inscricao.nome_completo}*!\n\n"
+    msg += f"Consta em nosso sistema que a sua parcela {p.numero_parcela} (R$ {p.valor_parcela:.2f}) do Jantar de Casais DEFAD está *pendente* e vence em {p.data_vencimento.strftime('%d/%m/%Y')}.\n\n"
+    msg += "Após realizar o pagamento, *envie e guarde o comprovante* enviando para o WhatsApp oficial:\n"
+    msg += "📲 wa.me/558382069331\n\n"
+    msg += "Se já efetuou o pagamento, por favor desconsidere esta mensagem.\n\n"
+    msg += "O QR Code e a chave PIX Copia e Cola serão enviados logo abaixo para facilitar o pagamento!"
+    
+    try:
+        from whatsapp import send_message, send_image_by_url
+        import urllib.parse
+        send_message(telefone, msg)
+        send_message(telefone, p.chave_pix_copia_cola)
+        
+        pix_encoded = urllib.parse.quote(p.chave_pix_copia_cola)
+        qr_url = f"https://api.qrserver.com/v1/create-qr-code/?size=300x300&data={pix_encoded}"
+        send_image_by_url(telefone, qr_url, "QR Code para Pagamento")
+        
+        inscricao.data_ultima_cobranca = date.today()
+        db.session.commit()
+        
+        flash(f'Cobrança manual enviada para {inscricao.nome_completo} com sucesso!', 'success')
+    except Exception as e:
+        print("Erro ao enviar cobrança manual:", e)
+        flash('Erro ao enviar cobrança manual pelo WhatsApp.', 'error')
+        
     return redirect(url_for('main.admin'))
 
 @bp.route('/admin/exportar_pdf')
@@ -642,12 +686,11 @@ def editar_inscricao(id):
                 msg += "Segue em anexo o *Comprovante Atualizado* com o novo resumo e plano de pagamento.\n"
                 
                 primeira_parcela = inscricao.parcelas[0]
-                msg += "\nPara adiantar, segue abaixo a nova chave PIX Copia e Cola da sua 1ª parcela (ou parcela única):\n\n"
-                msg += f"`{primeira_parcela.chave_pix_copia_cola}`\n\n"
-                msg += "O QR Code também será enviado na próxima mensagem!"
+                msg += "\nPara adiantar, o QR Code e a nova chave PIX Copia e Cola da sua 1ª parcela (ou parcela única) serão enviados nas próximas mensagens para facilitar a cópia!"
                 
                 send_file_by_upload(inscricao.telefone, bytes(pdf_bytes), "Comprovante_Atualizado.pdf", "Resumo da Inscrição Atualizado")
                 send_message(inscricao.telefone, msg)
+                send_message(inscricao.telefone, primeira_parcela.chave_pix_copia_cola)
                 
                 from whatsapp import send_image_by_url
                 import urllib.parse
