@@ -238,12 +238,23 @@ def inscrever():
         msg += "Após realizar o pagamento, *envie e guarde o comprovante de pagamento* enviando para o WhatsApp oficial do evento:\n"
         msg += "📲 wa.me/558382069331\n\n"
         msg += "Segue em anexo o *Comprovante de Solicitação* com o resumo e plano de pagamento.\n"
-        msg += "Verifique a tela do site para realizar o pagamento, ou aguarde nossas cobranças com o PIX Copia e Cola!"
+        
+        primeira_parcela = nova_inscricao.parcelas[0]
+        msg += "\nPara adiantar, segue abaixo a chave PIX Copia e Cola da sua 1ª parcela (ou parcela única):\n\n"
+        msg += f"`{primeira_parcela.chave_pix_copia_cola}`\n\n"
+        msg += "O QR Code também será enviado na próxima mensagem!"
         
         # Envia PDF primeiro
         send_file_by_upload(telefone, bytes(pdf_bytes), "Comprovante_Solicitacao.pdf", "Resumo da Inscrição")
         # Envia Mensagem de texto
         send_message(telefone, msg)
+        
+        # Envia Imagem QR Code
+        from whatsapp import send_image_by_url
+        import urllib.parse
+        pix_encoded = urllib.parse.quote(primeira_parcela.chave_pix_copia_cola)
+        qr_url = f"https://api.qrserver.com/v1/create-qr-code/?size=300x300&data={pix_encoded}"
+        send_image_by_url(telefone, qr_url, "QR Code para Pagamento (1ª Parcela)")
     except Exception as e:
         print("Erro ao enviar WhatsApp de Solicitação:", e)
 
@@ -629,10 +640,20 @@ def editar_inscricao(id):
                 msg += f"O seu ingresso é: *{inscricao.tipo_inscricao}*.\n"
                 msg += "As parcelas e pagamentos foram recalculados conforme o novo plano escolhido.\n\n"
                 msg += "Segue em anexo o *Comprovante Atualizado* com o novo resumo e plano de pagamento.\n"
-                msg += "Verifique a tela do site ou aguarde nossas cobranças com o PIX Copia e Cola!"
+                
+                primeira_parcela = inscricao.parcelas[0]
+                msg += "\nPara adiantar, segue abaixo a nova chave PIX Copia e Cola da sua 1ª parcela (ou parcela única):\n\n"
+                msg += f"`{primeira_parcela.chave_pix_copia_cola}`\n\n"
+                msg += "O QR Code também será enviado na próxima mensagem!"
                 
                 send_file_by_upload(inscricao.telefone, bytes(pdf_bytes), "Comprovante_Atualizado.pdf", "Resumo da Inscrição Atualizado")
                 send_message(inscricao.telefone, msg)
+                
+                from whatsapp import send_image_by_url
+                import urllib.parse
+                pix_encoded = urllib.parse.quote(primeira_parcela.chave_pix_copia_cola)
+                qr_url = f"https://api.qrserver.com/v1/create-qr-code/?size=300x300&data={pix_encoded}"
+                send_image_by_url(inscricao.telefone, qr_url, "QR Code para Pagamento (1ª Parcela)")
             except Exception as e:
                 print("Erro ao enviar WhatsApp de atualização:", e)
             

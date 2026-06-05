@@ -65,7 +65,9 @@ def create_app():
             
             # Gera url do QR Code para envio de imagem
             # api.qrserver.com é uma API pública e gratuita
-            qr_url = f"https://api.qrserver.com/v1/create-qr-code/?size=300x300&data={p.chave_pix_copia_cola}"
+            import urllib.parse
+            pix_encoded = urllib.parse.quote(p.chave_pix_copia_cola)
+            qr_url = f"https://api.qrserver.com/v1/create-qr-code/?size=300x300&data={pix_encoded}"
             send_image_by_url(telefone, qr_url, "QR Code para Pagamento")
             
             print(f"Cobrança enviada para {inscricao.nome_completo} ({telefone})")
