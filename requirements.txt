@@ -4,3 +4,4 @@ python-dateutil==2.9.0
 requests==2.31.0
 fpdf2==2.7.9
 gunicorn==22.0.0
+Flask-APScheduler==1.13.1
