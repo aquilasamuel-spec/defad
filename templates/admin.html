@@ -152,6 +152,13 @@
                                     <svg class="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 24 24"><path d="M12 0a12 12 0 1012 12A12.013 12.013 0 0012 0zm6.812 16.924a3.195 3.195 0 01-2.204 1.488c-1.378.13-4.302-1.04-8.03-4.767-3.727-3.727-4.896-6.65-4.766-8.028a3.2 3.2 0 011.488-2.205 1.5 1.5 0 011.594.133l2.25 1.5a1.5 1.5 0 01.624 1.34c-.035.433-.284.82-.676 1.05l-1.076.634a.75.75 0 00-.317.842 10.354 10.354 0 004.836 4.836.75.75 0 00.842-.317l.634-1.076a1.5 1.5 0 011.05-.676 1.5 1.5 0 011.34.624l1.5 2.25a1.5 1.5 0 01.134 1.594z"/></svg>
                                     {{ i.telefone }}
                                 </a>
+                                {% if i.data_ultima_cobranca and i.data_ultima_cobranca.month == hoje.month and i.data_ultima_cobranca.year == hoje.year %}
+                                <div class="mt-2">
+                                    <span class="inline-flex items-center px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-indigo-700 bg-indigo-100 border border-indigo-200 rounded">
+                                        ✓ Cobrado Mês: {{ i.data_ultima_cobranca.strftime('%d/%m') }}
+                                    </span>
+                                </div>
+                                {% endif %}
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap">
                                 <span class="px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">
@@ -191,6 +198,13 @@
                                     {% endfor %}
                                 </div>
                                 <div class="mt-4 pt-3 border-t border-gray-100 text-right flex justify-end space-x-2">
+                                    {% if i.status_geral != 'Pago Total' %}
+                                    <form action="{{ url_for('main.cobrar_manual', id=i.id) }}" method="POST" class="inline">
+                                        <button type="submit" class="inline-flex items-center text-xs font-semibold text-green-700 hover:text-green-900 transition bg-green-50 hover:bg-green-100 border border-green-200 px-2 py-1 rounded-md" onclick="return confirm('Deseja enviar uma mensagem de cobrança agora para este cliente?')">
+                                            Cobrar Agora
+                                        </button>
+                                    </form>
+                                    {% endif %}
                                     <button onclick="openEditModal({{ i.id }}, '{{ i.nome_completo }}', '{{ i.nome_conjuge }}', '{{ i.telefone }}', '{{ i.data_casamento.strftime('%Y-%m-%d') }}', '{{ i.local_congregacao }}', '{{ i.tipo_inscricao }}')" class="inline-flex items-center text-xs font-semibold text-blue-600 hover:text-blue-800 transition bg-blue-50 hover:bg-blue-100 px-2 py-1 rounded-md">
                                         Editar
                                     </button>
