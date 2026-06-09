@@ -38,7 +38,7 @@
         {% endwith %}
 
         <!-- DASHBOARD CARDS -->
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
             <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 flex items-center justify-between">
                 <div>
                     <p class="text-sm font-semibold text-gray-500 uppercase">Total de Inscritos</p>
@@ -51,7 +51,7 @@
             
             <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 flex items-center justify-between">
                 <div>
-                    <p class="text-sm font-semibold text-gray-500 uppercase">Valor Arrecadado (Pago)</p>
+                    <p class="text-sm font-semibold text-gray-500 uppercase">Arrecadado (Pago)</p>
                     <p class="text-4xl font-extrabold text-green-600 mt-2">R$ {{ "%.2f"|format(valor_arrecadado) }}</p>
                 </div>
                 <div class="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center text-green-600">
@@ -66,6 +66,16 @@
                 </div>
                 <div class="w-12 h-12 bg-orange-100 rounded-full flex items-center justify-center text-orange-500">
                     <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                </div>
+            </div>
+
+            <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 flex items-center justify-between">
+                <div>
+                    <p class="text-sm font-semibold text-gray-500 uppercase">Total de Saídas</p>
+                    <p class="text-4xl font-extrabold text-red-600 mt-2">R$ {{ "%.2f"|format(total_saidas) }}</p>
+                </div>
+                <div class="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center text-red-600">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
                 </div>
             </div>
         </div>
@@ -115,6 +125,62 @@
             </div>
         </div>
 
+        <!-- REGISTRO DE SAÍDAS -->
+        <div class="mb-10 flex flex-col md:flex-row gap-6">
+            <div class="w-full md:w-1/3 bg-white p-6 rounded-2xl shadow-sm border border-gray-200">
+                <h2 class="text-xl font-bold text-gray-900 mb-4">💸 Registrar Saída</h2>
+                <form action="{{ url_for('main.nova_saida') }}" method="POST" class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700">Descrição</label>
+                        <input type="text" name="descricao" placeholder="Ex: Fornecedor, Equipamento..." required class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-red-500 focus:border-red-500 sm:text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700">Valor (R$)</label>
+                        <input type="number" step="0.01" name="valor" placeholder="0.00" required class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-red-500 focus:border-red-500 sm:text-sm">
+                    </div>
+                    <button type="submit" class="w-full bg-red-600 text-white py-2 px-4 rounded-lg font-bold hover:bg-red-700 transition">Registrar Saída</button>
+                </form>
+            </div>
+            
+            <div class="w-full md:w-2/3 bg-white p-6 rounded-2xl shadow-sm border border-gray-200">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-xl font-bold text-gray-900">Histórico de Saídas</h2>
+                    <a href="{{ url_for('main.exportar_financeiro') }}" class="inline-flex items-center px-4 py-2 bg-gray-800 text-white text-sm font-medium rounded-lg hover:bg-gray-900 shadow-sm transition">
+                        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                        Exportar Financeiro (PDF)
+                    </a>
+                </div>
+                <div class="overflow-y-auto max-h-64">
+                    <table class="min-w-full divide-y divide-gray-200 text-sm">
+                        <thead class="bg-gray-50 sticky top-0">
+                            <tr>
+                                <th class="px-4 py-2 text-left font-semibold text-gray-600">Data</th>
+                                <th class="px-4 py-2 text-left font-semibold text-gray-600">Descrição</th>
+                                <th class="px-4 py-2 text-right font-semibold text-gray-600">Valor</th>
+                                <th class="px-4 py-2 text-center font-semibold text-gray-600">Ação</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-100">
+                            {% for s in saidas %}
+                            <tr class="hover:bg-gray-50">
+                                <td class="px-4 py-2 whitespace-nowrap">{{ s.data_registro.strftime('%d/%m/%Y %H:%M') }}</td>
+                                <td class="px-4 py-2">{{ s.descricao }}</td>
+                                <td class="px-4 py-2 text-right text-red-600 font-semibold whitespace-nowrap">R$ {{ "%.2f"|format(s.valor) }}</td>
+                                <td class="px-4 py-2 text-center">
+                                    <form action="{{ url_for('main.excluir_saida', id=s.id) }}" method="POST" onsubmit="return confirm('Excluir esta saída?');">
+                                        <button type="submit" class="text-red-500 hover:text-red-700 font-bold px-2 py-1">X</button>
+                                    </form>
+                                </td>
+                            </tr>
+                            {% else %}
+                            <tr><td colspan="4" class="px-4 py-4 text-center text-gray-500">Nenhuma saída registrada.</td></tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
         <!-- LISTA DE INSCRITOS -->
         <div class="flex flex-col sm:flex-row sm:justify-between sm:items-end gap-4 mb-6">
             <h2 class="text-2xl font-bold text-gray-900">👥 Inscritos Recentes</h2>
@@ -122,7 +188,7 @@
                 <input type="text" id="searchInput" onkeyup="filterTable()" placeholder="Pesquisar por nome..." class="px-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500 min-w-[250px]">
                 <a href="{{ url_for('main.exportar_pdf') }}" class="inline-flex items-center px-4 py-2 bg-gray-800 text-white text-sm font-medium rounded-lg hover:bg-gray-900 shadow-sm transition">
                     <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
-                    Baixar Relatório PDF
+                    Exportar Inscritos (PDF)
                 </a>
             </div>
         </div>
