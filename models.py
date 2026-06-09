@@ -38,3 +38,10 @@ class ParcelaPagamento(db.Model):
     data_vencimento = db.Column(db.Date, nullable=False)
     status_parcela = db.Column(db.String(50), default='Pendente') # 'Pendente' ou 'Pago'
     chave_pix_copia_cola = db.Column(db.Text, nullable=True)
+
+class Saida(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    descricao = db.Column(db.String(255), nullable=False)
+    valor = db.Column(db.Float, nullable=False)
+    data_registro = db.Column(db.DateTime, default=datetime.utcnow)
+

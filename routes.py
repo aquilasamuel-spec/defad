@@ -1,5 +1,5 @@
 from flask import Blueprint, render_template, request, redirect, url_for, flash, session, current_app
-from models import db, Inscricao, ParcelaPagamento, Produto
+from models import db, Inscricao, ParcelaPagamento, Produto, Saida
 from datetime import datetime, date
 from dateutil.relativedelta import relativedelta
 import random
@@ -297,15 +297,20 @@ def admin():
     parcelas_pendentes = ParcelaPagamento.query.filter_by(status_parcela='Pendente').all()
     valor_a_receber = sum(p.valor_parcela for p in parcelas_pendentes)
     
+    saidas = Saida.query.order_by(Saida.data_registro.desc()).all()
+    total_saidas = sum(s.valor for s in saidas)
+    
     max_parcelas = get_max_parcelas()
     meses_disponiveis = list(range(1, max_parcelas + 1))
     
     return render_template('admin.html', 
                            inscricoes=inscricoes, 
                            produtos=produtos,
+                           saidas=saidas,
                            total_inscritos=total_inscritos,
                            valor_arrecadado=valor_arrecadado,
                            valor_a_receber=valor_a_receber,
+                           total_saidas=total_saidas,
                            meses_disponiveis=meses_disponiveis,
                            hoje=date.today())
 
@@ -703,3 +708,122 @@ def editar_inscricao(id):
     db.session.commit()
     flash(f'Inscrição de {inscricao.nome_completo} atualizada com sucesso!', 'success')
     return redirect(url_for('main.admin'))
+
+@bp.route('/admin/nova_saida', methods=['POST'])
+def nova_saida():
+    if not session.get('admin_logged_in'):
+        return redirect(url_for('main.admin_login'))
+        
+    descricao = request.form.get('descricao')
+    valor_str = request.form.get('valor')
+    try:
+        valor = float(valor_str.replace(',', '.'))
+        saida = Saida(descricao=descricao, valor=valor)
+        db.session.add(saida)
+        db.session.commit()
+        flash('Saída registrada com sucesso!', 'success')
+    except:
+        flash('Erro ao registrar saída. Verifique o valor.', 'error')
+        
+    return redirect(url_for('main.admin'))
+
+@bp.route('/admin/excluir_saida/<int:id>', methods=['POST'])
+def excluir_saida(id):
+    if not session.get('admin_logged_in'):
+        return redirect(url_for('main.admin_login'))
+        
+    saida = Saida.query.get_or_404(id)
+    db.session.delete(saida)
+    db.session.commit()
+    flash('Saída excluída com sucesso!', 'success')
+    return redirect(url_for('main.admin'))
+
+@bp.route('/admin/exportar_financeiro')
+def exportar_financeiro():
+    if not session.get('admin_logged_in'):
+        return redirect(url_for('main.admin_login'))
+        
+    try:
+        from fpdf import FPDF
+    except ImportError:
+        flash("Biblioteca fpdf2 não está instalada.", "error")
+        return redirect(url_for('main.admin'))
+
+    parcelas_pagas = ParcelaPagamento.query.filter_by(status_parcela='Pago').all()
+    entradas = [p for p in parcelas_pagas]
+    saidas = Saida.query.order_by(Saida.data_registro.desc()).all()
+    
+    total_entradas = sum(p.valor_parcela for p in entradas)
+    total_saidas = sum(s.valor for s in saidas)
+    saldo = total_entradas - total_saidas
+
+    class PDF(FPDF):
+        def header(self):
+            self.set_font("helvetica", "B", 15)
+            self.cell(0, 10, "Relatório Financeiro - Jantar de Casais DEFAD", new_x="LMARGIN", new_y="NEXT", align="C")
+            self.ln(5)
+
+        def footer(self):
+            self.set_y(-15)
+            self.set_font("helvetica", "I", 8)
+            self.cell(0, 10, f"Página {self.page_no()}/{{nb}}", align="C")
+
+    pdf = PDF()
+    pdf.add_page()
+    
+    # Resumo
+    pdf.set_font("helvetica", "B", 12)
+    pdf.cell(0, 10, "Resumo Financeiro", new_x="LMARGIN", new_y="NEXT")
+    pdf.set_font("helvetica", "", 10)
+    pdf.cell(0, 8, f"Total de Entradas: R$ {total_entradas:.2f}", new_x="LMARGIN", new_y="NEXT")
+    pdf.cell(0, 8, f"Total de Saídas: R$ {total_saidas:.2f}", new_x="LMARGIN", new_y="NEXT")
+    pdf.set_font("helvetica", "B", 10)
+    pdf.cell(0, 8, f"Saldo Final: R$ {saldo:.2f}", new_x="LMARGIN", new_y="NEXT")
+    pdf.ln(5)
+
+    # Entradas
+    pdf.set_font("helvetica", "B", 12)
+    pdf.cell(0, 10, "Entradas (Parcelas Pagas)", new_x="LMARGIN", new_y="NEXT")
+    pdf.set_font("helvetica", "B", 10)
+    pdf.cell(60, 10, "Inscrito", border=1, align="C")
+    pdf.cell(30, 10, "Parcela", border=1, align="C")
+    pdf.cell(40, 10, "Data Vencimento", border=1, align="C")
+    pdf.cell(40, 10, "Valor", border=1, align="C", new_x="LMARGIN", new_y="NEXT")
+    
+    pdf.set_font("helvetica", "", 9)
+    for p in entradas:
+        nome = p.inscricao.nome_completo
+        if len(nome) > 30: nome = nome[:27] + "..."
+        pdf.cell(60, 8, nome, border=1)
+        pdf.cell(30, 8, f"{p.numero_parcela}x", border=1, align="C")
+        pdf.cell(40, 8, p.data_vencimento.strftime("%d/%m/%Y"), border=1, align="C")
+        pdf.cell(40, 8, f"R$ {p.valor_parcela:.2f}", border=1, align="R", new_x="LMARGIN", new_y="NEXT")
+        
+    pdf.ln(5)
+    
+    # Saídas
+    pdf.set_font("helvetica", "B", 12)
+    pdf.cell(0, 10, "Saídas (Despesas)", new_x="LMARGIN", new_y="NEXT")
+    pdf.set_font("helvetica", "B", 10)
+    pdf.cell(100, 10, "Descrição", border=1, align="C")
+    pdf.cell(40, 10, "Data", border=1, align="C")
+    pdf.cell(40, 10, "Valor", border=1, align="C", new_x="LMARGIN", new_y="NEXT")
+    
+    pdf.set_font("helvetica", "", 9)
+    for s in saidas:
+        desc = s.descricao
+        if len(desc) > 55: desc = desc[:52] + "..."
+        pdf.cell(100, 8, desc, border=1)
+        pdf.cell(40, 8, s.data_registro.strftime("%d/%m/%Y"), border=1, align="C")
+        pdf.cell(40, 8, f"R$ {s.valor:.2f}", border=1, align="R", new_x="LMARGIN", new_y="NEXT")
+
+    from flask import send_file
+    import io
+    pdf_bytes = pdf.output(dest='S')
+    
+    return send_file(
+        io.BytesIO(pdf_bytes),
+        mimetype='application/pdf',
+        as_attachment=True,
+        download_name='relatorio_financeiro.pdf'
+    )
