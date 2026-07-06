@@ -124,16 +124,15 @@ def send_image_by_url(phone, image_url, caption=""):
             print("Detalhes do erro Meta:", e.response.text)
         return None
 
-def send_file_by_upload(phone, file_bytes, filename, caption=""):
-    """Envia um arquivo PDF por upload (Requer janela de 24h aberta)"""
-    # Passo 1: Fazer upload do arquivo para a Meta e obter o media_id
+def upload_media(file_bytes, filename, mime_type='application/pdf'):
+    """Faz upload de uma mídia para a Meta e retorna o media_id"""
     url_media = f"{API_URL}/media"
     headers_media = {
         'Authorization': f'Bearer {WHATSAPP_ACCESS_TOKEN}'
     }
     
     files = {
-        'file': (filename, file_bytes, 'application/pdf')
+        'file': (filename, file_bytes, mime_type)
     }
     data = {
         'messaging_product': 'whatsapp'
@@ -142,11 +141,20 @@ def send_file_by_upload(phone, file_bytes, filename, caption=""):
     try:
         res_media = requests.post(url_media, headers=headers_media, data=data, files=files)
         res_media.raise_for_status()
-        media_id = res_media.json().get('id')
+        return res_media.json().get('id')
     except Exception as e:
-        print(f"Erro ao fazer upload do arquivo para a Meta: {e}")
+        print(f"Erro ao fazer upload da mídia para a Meta: {e}")
         if hasattr(e, 'response') and e.response is not None:
             print("Detalhes do erro Meta:", e.response.text)
+        return None
+
+def send_file_by_upload(phone, file_bytes, filename, caption=""):
+    """Envia um arquivo PDF por upload (Requer janela de 24h aberta)"""
+    # Passo 1: Fazer upload do arquivo para a Meta e obter o media_id
+    media_id = upload_media(file_bytes, filename, 'application/pdf')
+    
+    if not media_id:
+        print("Não foi possível obter o media_id. Abortando envio de arquivo.")
         return None
         
     # Passo 2: Enviar a mensagem com o media_id

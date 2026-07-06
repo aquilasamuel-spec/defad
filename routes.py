@@ -232,20 +232,40 @@ def inscrever():
             
         pdf_bytes = pdf.output(dest='S')
         
-        # Mensagem Texto
-        msg = f"Olá, *{nome_completo}*!\n\nRecebemos a solicitação de inscrição para o *Jantar de Casais DEFAD*.\n\n"
-        msg += "\n*Importante:* A sua inscrição só será de fato efetivada quando realizar o pagamento por completo.\n\n"
-        msg += "Após realizar o pagamento, *envie e guarde o comprovante de pagamento* enviando para o WhatsApp oficial do evento:\n"
-        msg += "📲 wa.me/558382069331\n\n"
-        msg += "Segue em anexo o *Comprovante de Solicitação* com o resumo e plano de pagamento.\n"
+        # Envia Template (Permitido fora da janela de 24h)
+        from whatsapp import upload_media, send_template
+        media_id = upload_media(bytes(pdf_bytes), "Comprovante_Solicitacao.pdf", "application/pdf")
+        
+        if media_id:
+            components = [
+                {
+                    "type": "header",
+                    "parameters": [
+                        {
+                            "type": "document",
+                            "document": {
+                                "id": media_id,
+                                "filename": "Comprovante_Solicitacao.pdf"
+                            }
+                        }
+                    ]
+                },
+                {
+                    "type": "body",
+                    "parameters": [
+                        {"type": "text", "text": str(nome_completo)},
+                        {"type": "text", "text": "Jantar de Casais DEFAD"},
+                        {"type": "text", "text": "wa.me/558382069331"}
+                    ]
+                }
+            ]
+            send_template(telefone, "inscricao_solicitada", components=components)
+        else:
+            print("Falha ao fazer upload do PDF da solicitação.")
         
         primeira_parcela = nova_inscricao.parcelas[0]
-        msg += "\nPara adiantar, o QR Code e a chave PIX Copia e Cola da sua 1ª parcela (ou parcela única) serão enviados nas próximas mensagens para facilitar a cópia!"
-        
-        # Envia PDF primeiro
-        send_file_by_upload(telefone, bytes(pdf_bytes), "Comprovante_Solicitacao.pdf", "Resumo da Inscrição")
-        # Envia Mensagem de texto
-        send_message(telefone, msg)
+        msg_pix = "Para adiantar, o QR Code e a chave PIX Copia e Cola da sua 1ª parcela (ou parcela única) serão enviados nas próximas mensagens para facilitar a cópia!"
+        send_message(telefone, msg_pix)
         # Envia PIX isolado
         send_message(telefone, primeira_parcela.chave_pix_copia_cola)
         
@@ -383,10 +403,34 @@ def pagar_parcela(id):
             
             pdf_bytes = pdf.output(dest='S')
             
-            msg = f"🎉 *COMPROVANTE DE INSCRIÇÃO REALIZADA* 🎉\n\nOlá, {inscricao.nome_completo}!\nO pagamento total da sua inscrição no Jantar de Casais DEFAD foi confirmado!\n\nSua vaga está garantida. Nos vemos lá!\n\n*Atenção:* O PDF anexo é o seu comprovante oficial para entrada no evento."
+            from whatsapp import upload_media, send_template
+            media_id = upload_media(bytes(pdf_bytes), "Comprovante_Ingresso_DEFAD.pdf", "application/pdf")
             
-            send_file_by_upload(inscricao.telefone, bytes(pdf_bytes), "Comprovante_Ingresso_DEFAD.pdf", "Ingresso do Evento")
-            send_message(inscricao.telefone, msg)
+            if media_id:
+                components = [
+                    {
+                        "type": "header",
+                        "parameters": [
+                            {
+                                "type": "document",
+                                "document": {
+                                    "id": media_id,
+                                    "filename": "Comprovante_Ingresso_DEFAD.pdf"
+                                }
+                            }
+                        ]
+                    },
+                    {
+                        "type": "body",
+                        "parameters": [
+                            {"type": "text", "text": str(inscricao.nome_completo)},
+                            {"type": "text", "text": "Jantar de Casais DEFAD"}
+                        ]
+                    }
+                ]
+                send_template(inscricao.telefone, "inscricao_finalizada", components=components)
+            else:
+                print("Falha ao fazer upload do PDF. O template não foi enviado.")
         except Exception as e:
             print("Erro ao enviar Comprovante WhatsApp:", e)
             
