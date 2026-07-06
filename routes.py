@@ -827,3 +827,50 @@ def exportar_financeiro():
         as_attachment=True,
         download_name='relatorio_financeiro.pdf'
     )
+
+@bp.route('/webhook', methods=['GET', 'POST'])
+def webhook():
+    import os
+    from flask import request, jsonify
+    
+    # Validação do webhook da Meta
+    if request.method == 'GET':
+        mode = request.args.get('hub.mode')
+        token = request.args.get('hub.verify_token')
+        challenge = request.args.get('hub.challenge')
+        
+        # Token de verificação definido no painel da Meta
+        VERIFY_TOKEN = os.environ.get('WHATSAPP_VERIFY_TOKEN', 'defad_webhook_123')
+        
+        if mode and token:
+            if mode == 'subscribe' and token == VERIFY_TOKEN:
+                return challenge, 200
+            else:
+                return 'Forbidden', 403
+        return 'Bad Request', 400
+        
+    # Recebimento de mensagens (POST)
+    if request.method == 'POST':
+        body = request.json
+        
+        if body.get('object'):
+            if 'entry' in body and body['entry'][0].get('changes'):
+                value = body['entry'][0]['changes'][0].get('value')
+                
+                # Verifica se é uma mensagem (ignora status de leitura/entrega)
+                if value and 'messages' in value:
+                    message = value['messages'][0]
+                    phone_number = message.get('from')
+                    
+                    # Ignorar nossas próprias mensagens ou mensagens do sistema
+                    if phone_number:
+                        try:
+                            from whatsapp import send_message
+                            # Enviar mensagem de redirecionamento para o humano
+                            msg_direcionamento = "Olá! Este é um número automatizado do sistema de inscrições.\n\nPara dúvidas ou atendimento humano, por favor entre em contato com nosso WhatsApp oficial:\n📲 wa.me/558382069331"
+                            send_message(phone_number, msg_direcionamento)
+                        except Exception as e:
+                            print(f"Erro no webhook ao redirecionar: {e}")
+                            
+            return jsonify({'status': 'ok'}), 200
+        return 'Not Found', 404

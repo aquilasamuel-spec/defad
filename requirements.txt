@@ -5,3 +5,4 @@ requests==2.31.0
 fpdf2==2.7.9
 gunicorn==22.0.0
 Flask-APScheduler==1.13.1
+python-dotenv==1.0.1

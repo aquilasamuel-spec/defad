@@ -1,15 +1,18 @@
 import requests
 import json
 import os
+from dotenv import load_dotenv
 
-# Credenciais do Green API
-# Usa variáveis de ambiente se existirem, caso contrário usa as chaves diretamente (para testes locais)
-ID_INSTANCE = os.environ.get('GREEN_API_ID_INSTANCE', '7107553786')
-API_TOKEN_INSTANCE = os.environ.get('GREEN_API_TOKEN_INSTANCE', '9cdf62444434459aad4a76e1c1a07a4a850de6e22a474bf996')
-API_URL = "https://7107.api.greenapi.com"
+load_dotenv()
+
+# Credenciais da API Oficial do WhatsApp (Meta Cloud API)
+WHATSAPP_PHONE_NUMBER_ID = os.environ.get('WHATSAPP_PHONE_NUMBER_ID', 'SEU_PHONE_NUMBER_ID')
+WHATSAPP_ACCESS_TOKEN = os.environ.get('WHATSAPP_ACCESS_TOKEN', 'SEU_ACCESS_TOKEN')
+WHATSAPP_API_VERSION = os.environ.get('WHATSAPP_API_VERSION', 'v19.0')
+API_URL = f"https://graph.facebook.com/{WHATSAPP_API_VERSION}/{WHATSAPP_PHONE_NUMBER_ID}"
 
 def format_phone_number(phone):
-    """Garante que o telefone tem apenas números e adiciona @c.us"""
+    """Garante que o telefone tem apenas números e aplica regras de nono dígito do Brasil"""
     clean_phone = ''.join(filter(str.isdigit, phone))
     
     # Se por algum motivo o usuário não preencheu o 55 da máscara, adiciona
@@ -22,69 +25,154 @@ def format_phone_number(phone):
         numero = clean_phone[4:]
         
         # Se DDD > 28 e o número tem 9 dígitos começando com 9, remove o 9
+        # (A API oficial da Meta costuma exigir sem o 9 para alguns DDDs > 28)
         if ddd > 28 and len(numero) == 9 and numero.startswith('9'):
             clean_phone = f"55{ddd:02d}{numero[1:]}"
             
-    return f"{clean_phone}@c.us"
+    # A API oficial não usa @c.us, apenas os números diretos
+    return clean_phone
 
 def send_message(phone, text):
-    url = f"{API_URL}/waInstance{ID_INSTANCE}/sendMessage/{API_TOKEN_INSTANCE}"
+    """Envia uma mensagem de texto livre (Requer janela de 24h aberta)"""
+    url = f"{API_URL}/messages"
     
     payload = {
-        "chatId": format_phone_number(phone),
-        "message": text
+        "messaging_product": "whatsapp",
+        "recipient_type": "individual",
+        "to": format_phone_number(phone),
+        "type": "text",
+        "text": {
+            "preview_url": False,
+            "body": text
+        }
     }
     headers = {
-        'Content-Type': 'application/json'
+        'Content-Type': 'application/json',
+        'Authorization': f'Bearer {WHATSAPP_ACCESS_TOKEN}'
     }
     
     try:
-        response = requests.post(url, headers=headers, data=json.dumps(payload))
+        response = requests.post(url, headers=headers, json=payload)
         response.raise_for_status()
         return response.json()
     except Exception as e:
         print(f"Erro ao enviar WhatsApp para {phone}: {e}")
+        if hasattr(e, 'response') and e.response is not None:
+            print("Detalhes do erro Meta:", e.response.text)
         return None
 
-def send_image_by_url(phone, image_url, caption=""):
-    url = f"{API_URL}/waInstance{ID_INSTANCE}/sendFileByUrl/{API_TOKEN_INSTANCE}"
+def send_template(phone, template_name, language_code="pt_BR", components=None):
+    """Envia um template aprovado da Meta (Não requer janela de 24h aberta)"""
+    url = f"{API_URL}/messages"
     
     payload = {
-        "chatId": format_phone_number(phone),
-        "urlFile": image_url,
-        "fileName": "qrcode_pix.png",
-        "caption": caption
+        "messaging_product": "whatsapp",
+        "to": format_phone_number(phone),
+        "type": "template",
+        "template": {
+            "name": template_name,
+            "language": {
+                "code": language_code
+            }
+        }
     }
+    
+    if components:
+        payload["template"]["components"] = components
+        
     headers = {
-        'Content-Type': 'application/json'
+        'Content-Type': 'application/json',
+        'Authorization': f'Bearer {WHATSAPP_ACCESS_TOKEN}'
     }
     
     try:
-        response = requests.post(url, headers=headers, data=json.dumps(payload))
+        response = requests.post(url, headers=headers, json=payload)
+        response.raise_for_status()
+        return response.json()
+    except Exception as e:
+        print(f"Erro ao enviar Template WhatsApp para {phone}: {e}")
+        if hasattr(e, 'response') and e.response is not None:
+            print("Detalhes do erro Meta:", e.response.text)
+        return None
+
+def send_image_by_url(phone, image_url, caption=""):
+    """Envia uma imagem por URL (Requer janela de 24h aberta)"""
+    url = f"{API_URL}/messages"
+    
+    payload = {
+        "messaging_product": "whatsapp",
+        "recipient_type": "individual",
+        "to": format_phone_number(phone),
+        "type": "image",
+        "image": {
+            "link": image_url,
+            "caption": caption
+        }
+    }
+    headers = {
+        'Content-Type': 'application/json',
+        'Authorization': f'Bearer {WHATSAPP_ACCESS_TOKEN}'
+    }
+    
+    try:
+        response = requests.post(url, headers=headers, json=payload)
         response.raise_for_status()
         return response.json()
     except Exception as e:
         print(f"Erro ao enviar QR Code WhatsApp para {phone}: {e}")
+        if hasattr(e, 'response') and e.response is not None:
+            print("Detalhes do erro Meta:", e.response.text)
         return None
 
 def send_file_by_upload(phone, file_bytes, filename, caption=""):
-    url = f"{API_URL}/waInstance{ID_INSTANCE}/sendFileByUpload/{API_TOKEN_INSTANCE}"
-    
-    payload = {
-        "chatId": format_phone_number(phone),
-        "caption": caption
+    """Envia um arquivo PDF por upload (Requer janela de 24h aberta)"""
+    # Passo 1: Fazer upload do arquivo para a Meta e obter o media_id
+    url_media = f"{API_URL}/media"
+    headers_media = {
+        'Authorization': f'Bearer {WHATSAPP_ACCESS_TOKEN}'
     }
     
-    # file_bytes is a bytes-like object
     files = {
-        "file": (filename, file_bytes, "application/pdf")
+        'file': (filename, file_bytes, 'application/pdf')
+    }
+    data = {
+        'messaging_product': 'whatsapp'
     }
     
     try:
-        # requests uses multipart/form-data automatically when files= is provided
-        response = requests.post(url, data=payload, files=files)
+        res_media = requests.post(url_media, headers=headers_media, data=data, files=files)
+        res_media.raise_for_status()
+        media_id = res_media.json().get('id')
+    except Exception as e:
+        print(f"Erro ao fazer upload do arquivo para a Meta: {e}")
+        if hasattr(e, 'response') and e.response is not None:
+            print("Detalhes do erro Meta:", e.response.text)
+        return None
+        
+    # Passo 2: Enviar a mensagem com o media_id
+    url_msg = f"{API_URL}/messages"
+    payload_msg = {
+        "messaging_product": "whatsapp",
+        "recipient_type": "individual",
+        "to": format_phone_number(phone),
+        "type": "document",
+        "document": {
+            "id": media_id,
+            "caption": caption,
+            "filename": filename
+        }
+    }
+    headers_msg = {
+        'Content-Type': 'application/json',
+        'Authorization': f'Bearer {WHATSAPP_ACCESS_TOKEN}'
+    }
+    
+    try:
+        response = requests.post(url_msg, headers=headers_msg, json=payload_msg)
         response.raise_for_status()
         return response.json()
     except Exception as e:
-        print(f"Erro ao fazer upload de arquivo para {phone}: {e}")
+        print(f"Erro ao enviar documento WhatsApp para {phone}: {e}")
+        if hasattr(e, 'response') and e.response is not None:
+            print("Detalhes do erro Meta:", e.response.text)
         return None
