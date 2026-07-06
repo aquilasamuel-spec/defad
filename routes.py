@@ -851,7 +851,16 @@ def webhook():
         
     # Recebimento de mensagens (POST)
     if request.method == 'POST':
-        body = request.json
+        # Usa force=True/silent=True para garantir que pegue o JSON mesmo se os headers falharem
+        body = request.get_json(force=True, silent=True)
+        
+        if not body:
+            print("Webhook recebeu um POST, mas o corpo não é JSON válido.")
+            return 'Bad Request', 400
+            
+        print("--- NOVO WEBHOOK RECEBIDO ---")
+        import json
+        print(json.dumps(body, indent=2))
         
         if body.get('object'):
             if 'entry' in body and body['entry'][0].get('changes'):
@@ -865,12 +874,16 @@ def webhook():
                     # Ignorar nossas próprias mensagens ou mensagens do sistema
                     if phone_number:
                         try:
+                            print(f"Recebido mensagem de: {phone_number}")
                             from whatsapp import send_message
                             # Enviar mensagem de redirecionamento para o humano
                             msg_direcionamento = "Olá! Este é um número automatizado do sistema de inscrições.\n\nPara dúvidas ou atendimento humano, por favor entre em contato com nosso WhatsApp oficial:\n📲 wa.me/558382069331"
-                            send_message(phone_number, msg_direcionamento)
+                            res = send_message(phone_number, msg_direcionamento)
+                            print("Resposta do envio:", res)
                         except Exception as e:
                             print(f"Erro no webhook ao redirecionar: {e}")
+                else:
+                    print("Webhook recebido, mas não contém 'messages'. Pode ser notificação de status de envio.")
                             
             return jsonify({'status': 'ok'}), 200
         return 'Not Found', 404
