@@ -393,13 +393,27 @@ def pagar_parcela(id):
     elif len(pagas) > 0:
         inscricao.status_geral = 'Pago Parcial'
         try:
-            from whatsapp import send_message
-            msg = f"Olá, {inscricao.nome_completo}!\nConfirmamos o pagamento da parcela {parcela.numero_parcela}.\n\n*Resumo das Parcelas:*\n"
+            from whatsapp import send_template
+            
+            lista_parcelas_str = ""
             for p in todas_parcelas:
                 icone = "✅" if p.status_parcela == "Pago" else "⏳"
-                msg += f"{icone} {p.numero_parcela}x - R$ {p.valor_parcela:.2f} ({p.status_parcela})\n"
-            msg += "\nObrigado!"
-            send_message(inscricao.telefone, msg)
+                lista_parcelas_str += f"{icone} {p.numero_parcela}x - R$ {p.valor_parcela:.2f} ({p.status_parcela})\n"
+            
+            lista_parcelas_str = lista_parcelas_str.strip()
+            
+            components = [
+                {
+                    "type": "body",
+                    "parameters": [
+                        {"type": "text", "text": str(inscricao.nome_completo)},
+                        {"type": "text", "text": str(parcela.numero_parcela)},
+                        {"type": "text", "text": lista_parcelas_str}
+                    ]
+                }
+            ]
+            
+            send_template(inscricao.telefone, "parcelas_pagas", components=components)
         except Exception as e:
             print("Erro ao enviar recibo parcial WhatsApp:", e)
             
@@ -424,22 +438,43 @@ def cobrar_manual(id):
     p = parcelas[0] # cobra a próxima pendente
     telefone = inscricao.telefone
     
-    msg = f"Olá, *{inscricao.nome_completo}*!\n\n"
-    msg += f"Consta em nosso sistema que a sua parcela {p.numero_parcela} (R$ {p.valor_parcela:.2f}) do Jantar de Casais DEFAD está *pendente* e vence em {p.data_vencimento.strftime('%d/%m/%Y')}.\n\n"
-    msg += "Após realizar o pagamento, *envie e guarde o comprovante* enviando para o WhatsApp oficial:\n"
-    msg += "📲 wa.me/558382069331\n\n"
-    msg += "Se já efetuou o pagamento, por favor desconsidere esta mensagem.\n\n"
-    msg += "O QR Code e a chave PIX Copia e Cola serão enviados logo abaixo para facilitar o pagamento!"
-    
     try:
-        from whatsapp import send_message, send_image_by_url
+        from whatsapp import send_message, send_template
         import urllib.parse
-        send_message(telefone, msg)
-        send_message(telefone, p.chave_pix_copia_cola)
         
         pix_encoded = urllib.parse.quote(p.chave_pix_copia_cola)
         qr_url = f"https://api.qrserver.com/v1/create-qr-code/?size=300x300&data={pix_encoded}"
-        send_image_by_url(telefone, qr_url, "QR Code para Pagamento")
+        
+        components = [
+            {
+                "type": "header",
+                "parameters": [
+                    {
+                        "type": "image",
+                        "image": {
+                            "link": qr_url
+                        }
+                    }
+                ]
+            },
+            {
+                "type": "body",
+                "parameters": [
+                    {"type": "text", "text": str(inscricao.nome_completo)},
+                    {"type": "text", "text": str(p.numero_parcela)},
+                    {"type": "text", "text": f"{p.valor_parcela:.2f}"},
+                    {"type": "text", "text": "Jantar de Casais DEFAD"},
+                    {"type": "text", "text": p.data_vencimento.strftime('%d/%m/%Y')},
+                    {"type": "text", "text": "wa.me/558382069331"}
+                ]
+            }
+        ]
+        
+        send_template(telefone, "cobranca_parcela", components=components)
+        
+        # Tenta enviar a chave PIX copia-e-cola em texto logo abaixo. 
+        # (Se a janela de 24h estiver fechada, isso falhará na Meta, mas o cliente já terá recebido o QR Code pelo Template acima)
+        send_message(telefone, p.chave_pix_copia_cola)
         
         inscricao.data_ultima_cobranca = date.today()
         db.session.commit()
