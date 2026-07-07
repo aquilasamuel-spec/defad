@@ -423,8 +423,8 @@ def pagar_parcela(id):
                     {
                         "type": "body",
                         "parameters": [
-                            {"type": "text", "text": str(inscricao.nome_completo)},
-                            {"type": "text", "text": "Jantar de Casais DEFAD"}
+                            {"type": "text", "name": "nome_inscrito", "text": str(inscricao.nome_completo)},
+                            {"type": "text", "name": "nome_evento", "text": "Jantar de Casais DEFAD"}
                         ]
                     }
                 ]
@@ -450,9 +450,9 @@ def pagar_parcela(id):
                 {
                     "type": "body",
                     "parameters": [
-                        {"type": "text", "text": str(inscricao.nome_completo)},
-                        {"type": "text", "text": str(parcela.numero_parcela)},
-                        {"type": "text", "text": lista_parcelas_str}
+                        {"type": "text", "name": "nome_inscrito", "text": str(inscricao.nome_completo)},
+                        {"type": "text", "name": "parcelas_pagas_agora", "text": str(parcela.numero_parcela)},
+                        {"type": "text", "name": "lista_parcelas", "text": lista_parcelas_str}
                     ]
                 }
             ]

@@ -90,9 +90,14 @@ def send_template(phone, template_name, language_code="pt_BR", components=None):
         response.raise_for_status()
         return response.json()
     except Exception as e:
-        print(f"Erro ao enviar Template WhatsApp para {phone}: {e}")
+        error_msg = f"Erro ao enviar Template WhatsApp para {phone}: {e}\n"
         if hasattr(e, 'response') and e.response is not None:
-            print("Detalhes do erro Meta:", e.response.text)
+            error_msg += f"Detalhes do erro Meta: {e.response.text}\n"
+        
+        print(error_msg)
+        with open("meta_errors.log", "a", encoding="utf-8") as f:
+            f.write(error_msg)
+        
         return None
 
 def send_image_by_url(phone, image_url, caption=""):
