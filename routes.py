@@ -230,6 +230,44 @@ def inscrever():
             pdf.cell(50, 10, f"R$ {parc.valor_parcela:.2f}", border="T", align="C")
             pdf.cell(50, 10, "Pendente", border="T", align="C", new_x="LMARGIN", new_y="NEXT")
             
+        # Adicionar QR Code e Chave PIX ao final do PDF
+        try:
+            import urllib.request
+            import urllib.parse
+            import tempfile
+            import os
+            
+            primeira_parcela = nova_inscricao.parcelas[0]
+            pix_encoded = urllib.parse.quote(primeira_parcela.chave_pix_copia_cola)
+            qr_url = f"https://api.qrserver.com/v1/create-qr-code/?size=300x300&data={pix_encoded}"
+            
+            with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as tmp_file:
+                qr_image_path = tmp_file.name
+            urllib.request.urlretrieve(qr_url, qr_image_path)
+            
+            pdf.ln(15)
+            pdf.set_font("helvetica", "B", 14)
+            pdf.set_text_color(20, 30, 50)
+            pdf.cell(0, 10, "Pagamento da 1ª Parcela", new_x="LMARGIN", new_y="NEXT", align="C")
+            pdf.ln(5)
+            
+            # Centralizar imagem 40x40
+            pdf.image(qr_image_path, x=85, w=40)
+            pdf.ln(45)
+            
+            pdf.set_font("helvetica", "", 10)
+            pdf.set_text_color(20, 30, 50)
+            pdf.cell(0, 6, "Ou utilize o código PIX Copia e Cola abaixo:", new_x="LMARGIN", new_y="NEXT", align="C")
+            pdf.ln(2)
+            
+            pdf.set_font("helvetica", "", 8)
+            pdf.set_text_color(100, 100, 100)
+            pdf.multi_cell(0, 5, primeira_parcela.chave_pix_copia_cola, align="C")
+            
+            os.remove(qr_image_path)
+        except Exception as e:
+            print("Erro ao embutir QR Code no PDF:", e)
+            
         pdf_bytes = pdf.output(dest='S')
         
         # Envia Template (Permitido fora da janela de 24h)

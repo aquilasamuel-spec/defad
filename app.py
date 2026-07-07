@@ -54,7 +54,7 @@ def create_app():
     def logica_cobranca():
         from models import ParcelaPagamento, Inscricao
         from datetime import date
-        from whatsapp import send_message, send_image_by_url
+        from whatsapp import send_message, send_template
         import urllib.parse
         
         hoje = date.today()
@@ -70,23 +70,42 @@ def create_app():
             inscricao = p.inscricao
             telefone = inscricao.telefone
             
-            msg = f"Olá, *{inscricao.nome_completo}*!\n\n"
-            if p.data_vencimento == hoje:
-                msg += f"Este é um lembrete amigável de que a sua parcela {p.numero_parcela} (R$ {p.valor_parcela:.2f}) do Jantar de Casais DEFAD vence *hoje*.\n\n"
-            else:
-                msg += f"Consta em nosso sistema que a sua parcela {p.numero_parcela} (R$ {p.valor_parcela:.2f}) do Jantar de Casais DEFAD está *pendente* e venceu em {p.data_vencimento.strftime('%d/%m/%Y')}.\n\n"
-                
-            msg += "Após realizar o pagamento, *envie e guarde o comprovante* enviando para o WhatsApp oficial:\n"
-            msg += "📲 wa.me/558382069331\n\n"
-            msg += "Se já efetuou o pagamento, por favor desconsidere esta mensagem.\n\n"
-            msg += "O QR Code e a chave PIX Copia e Cola serão enviados logo abaixo para facilitar o pagamento!"
-            
-            send_message(telefone, msg)
-            send_message(telefone, p.chave_pix_copia_cola)
+            import requests
+            from whatsapp import upload_media
             
             pix_encoded = urllib.parse.quote(p.chave_pix_copia_cola)
             qr_url = f"https://api.qrserver.com/v1/create-qr-code/?size=300x300&data={pix_encoded}"
-            send_image_by_url(telefone, qr_url, "QR Code para Pagamento")
+            
+            qr_response = requests.get(qr_url)
+            media_id = upload_media(qr_response.content, "qrcode.png", "image/png")
+            
+            components = [
+                {
+                    "type": "header",
+                    "parameters": [
+                        {
+                            "type": "image",
+                            "image": {
+                                "id": media_id
+                            } if media_id else {
+                                "link": qr_url
+                            }
+                        }
+                    ]
+                },
+                {
+                    "type": "body",
+                    "parameters": [
+                        {"type": "text", "parameter_name": "nome_inscrito", "text": str(inscricao.nome_completo)},
+                        {"type": "text", "parameter_name": "numero_parcela", "text": str(p.numero_parcela)},
+                        {"type": "text", "parameter_name": "valor_parcela", "text": f"{p.valor_parcela:.2f}"},
+                        {"type": "text", "parameter_name": "nome_evento", "text": "Jantar de Casais DEFAD"},
+                        {"type": "text", "parameter_name": "data_vencimento", "text": p.data_vencimento.strftime('%d/%m/%Y')},
+                        {"type": "text", "parameter_name": "link_whatsapp", "text": "wa.me/558382069331"}
+                    ]
+                }
+            ]
+            send_template(telefone, "cobranca_parcela", components=components)
             
             inscricao.data_ultima_cobranca = hoje
             from models import db
