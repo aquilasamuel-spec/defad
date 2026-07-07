@@ -432,9 +432,9 @@ def pagar_parcela(id):
             lista_parcelas_str = ""
             for p in todas_parcelas:
                 icone = "✅" if p.status_parcela == "Pago" else "⏳"
-                lista_parcelas_str += f"{icone} {p.numero_parcela}x - R$ {p.valor_parcela:.2f} ({p.status_parcela})\n"
+                lista_parcelas_str += f"{icone} {p.numero_parcela}x - R$ {p.valor_parcela:.2f} ({p.status_parcela}), "
             
-            lista_parcelas_str = lista_parcelas_str.strip()
+            lista_parcelas_str = lista_parcelas_str.strip(', ')
             
             components = [
                 {
