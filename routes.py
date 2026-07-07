@@ -161,74 +161,74 @@ def inscrever():
         import io
         
         # Gerar o PDF de Comprovante de Solicitação
-        class ReceiptPDF(FPDF):
-            def header(self):
-                self.set_font("helvetica", "B", 20)
-                self.set_text_color(0, 150, 0)
-                self.cell(0, 15, "Inscrição Realizada com Sucesso!", new_x="LMARGIN", new_y="NEXT", align="C")
-                self.set_font("helvetica", "", 12)
-                self.set_text_color(100, 100, 100)
-                self.cell(0, 10, f"Obrigado, {nome_completo}. Sua vaga está reservada.", new_x="LMARGIN", new_y="NEXT", align="C")
-                self.ln(10)
-                self.set_draw_color(220, 220, 220)
-                self.line(10, self.get_y(), 200, self.get_y())
-                self.ln(10)
-
-        pdf = ReceiptPDF()
+        pdf = FPDF()
         pdf.add_page()
+        
+        # Cabeçalho
+        pdf.set_font("helvetica", "B", 22)
+        pdf.set_text_color(30, 41, 59) # Slate 800
+        pdf.cell(0, 12, "Inscrição Solicitada", new_x="LMARGIN", new_y="NEXT", align="C")
+        pdf.set_font("helvetica", "", 11)
+        pdf.set_text_color(100, 116, 139) # Slate 500
+        pdf.cell(0, 8, f"Obrigado, {nome_completo}. Sua vaga foi reservada.", new_x="LMARGIN", new_y="NEXT", align="C")
+        pdf.ln(4)
+        pdf.set_draw_color(226, 232, 240) # Slate 200
+        pdf.line(15, pdf.get_y(), 195, pdf.get_y())
+        pdf.ln(6)
         
         # Resumo da Inscrição
         pdf.set_font("helvetica", "B", 14)
-        pdf.set_text_color(20, 30, 50)
-        pdf.cell(0, 10, "Resumo da Inscrição", new_x="LMARGIN", new_y="NEXT")
+        pdf.set_text_color(30, 41, 59)
+        pdf.cell(0, 8, "Resumo da Inscrição", new_x="LMARGIN", new_y="NEXT")
         pdf.ln(2)
         
         pdf.set_font("helvetica", "", 10)
-        pdf.set_text_color(120, 120, 120)
-        pdf.cell(90, 6, "Tipo", new_x="RIGHT")
-        pdf.cell(90, 6, "Cônjuge", new_x="LMARGIN", new_y="NEXT")
-        
-        pdf.set_font("helvetica", "", 11)
-        pdf.set_text_color(20, 30, 50)
-        pdf.cell(90, 8, tipo_inscricao.replace('_', ' + ').title(), new_x="RIGHT")
-        pdf.cell(90, 8, nome_conjuge, new_x="LMARGIN", new_y="NEXT")
-        pdf.ln(5)
-        
-        pdf.set_font("helvetica", "", 10)
-        pdf.set_text_color(120, 120, 120)
-        pdf.cell(90, 6, "Status Geral", new_x="LMARGIN", new_y="NEXT")
+        pdf.set_text_color(100, 116, 139)
+        pdf.cell(90, 5, "Tipo", new_x="RIGHT")
+        pdf.cell(90, 5, "Cônjuge", new_x="LMARGIN", new_y="NEXT")
         
         pdf.set_font("helvetica", "B", 11)
-        pdf.set_text_color(200, 150, 0) # Pendente amarelado
-        pdf.cell(90, 8, "Pendente", new_x="LMARGIN", new_y="NEXT")
-        pdf.ln(10)
+        pdf.set_text_color(51, 65, 85)
+        pdf.cell(90, 6, tipo_inscricao.replace('_', ' + ').title(), new_x="RIGHT")
+        pdf.cell(90, 6, nome_conjuge, new_x="LMARGIN", new_y="NEXT")
+        pdf.ln(4)
         
-        pdf.set_draw_color(220, 220, 220)
-        pdf.line(10, pdf.get_y(), 200, pdf.get_y())
-        pdf.ln(10)
+        pdf.set_font("helvetica", "", 10)
+        pdf.set_text_color(100, 116, 139)
+        pdf.cell(90, 5, "Status Geral", new_x="LMARGIN", new_y="NEXT")
+        
+        pdf.set_font("helvetica", "B", 11)
+        pdf.set_text_color(234, 179, 8) # Yellow 500
+        pdf.cell(90, 6, "Pendente", new_x="LMARGIN", new_y="NEXT")
+        pdf.ln(6)
+        
+        pdf.set_draw_color(226, 232, 240)
+        pdf.line(15, pdf.get_y(), 195, pdf.get_y())
+        pdf.ln(6)
         
         # Plano de Pagamento
         pdf.set_font("helvetica", "B", 14)
-        pdf.set_text_color(20, 30, 50)
-        pdf.cell(0, 10, "Plano de Pagamento", new_x="LMARGIN", new_y="NEXT")
-        pdf.ln(5)
+        pdf.set_text_color(30, 41, 59)
+        pdf.cell(0, 8, "Plano de Pagamento", new_x="LMARGIN", new_y="NEXT")
+        pdf.ln(3)
         
         # Tabela cabeçalho
         pdf.set_font("helvetica", "B", 10)
-        pdf.set_text_color(20, 30, 50)
-        pdf.cell(30, 10, "Parcela", border="T", align="C")
-        pdf.cell(50, 10, "Vencimento", border="T", align="C")
-        pdf.cell(50, 10, "Valor", border="T", align="C")
-        pdf.cell(50, 10, "Status", border="T", align="C", new_x="LMARGIN", new_y="NEXT")
+        pdf.set_text_color(71, 85, 105)
+        pdf.set_fill_color(248, 250, 252)
+        pdf.cell(30, 8, "Parcela", border=0, align="C", fill=True)
+        pdf.cell(50, 8, "Vencimento", border=0, align="C", fill=True)
+        pdf.cell(50, 8, "Valor", border=0, align="C", fill=True)
+        pdf.cell(50, 8, "Status", border=0, align="C", fill=True, new_x="LMARGIN", new_y="NEXT")
         
         # Tabela linhas
         pdf.set_font("helvetica", "", 10)
-        pdf.set_text_color(100, 100, 100)
+        pdf.set_text_color(71, 85, 105)
         for i, parc in enumerate(nova_inscricao.parcelas):
-            pdf.cell(30, 10, f"{i+1}x", border="T", align="C")
-            pdf.cell(50, 10, parc.data_vencimento.strftime("%d/%m/%Y"), border="T", align="C")
-            pdf.cell(50, 10, f"R$ {parc.valor_parcela:.2f}", border="T", align="C")
-            pdf.cell(50, 10, "Pendente", border="T", align="C", new_x="LMARGIN", new_y="NEXT")
+            pdf.cell(30, 8, f"{i+1}x", border="B", align="C")
+            pdf.cell(50, 8, parc.data_vencimento.strftime("%d/%m/%Y"), border="B", align="C")
+            pdf.cell(50, 8, f"R$ {parc.valor_parcela:.2f}", border="B", align="C")
+            pdf.cell(50, 8, "Pendente", border="B", align="C", new_x="LMARGIN", new_y="NEXT")
             
         # Adicionar QR Code e Chave PIX ao final do PDF
         try:
@@ -245,24 +245,24 @@ def inscrever():
                 qr_image_path = tmp_file.name
             urllib.request.urlretrieve(qr_url, qr_image_path)
             
-            pdf.ln(15)
-            pdf.set_font("helvetica", "B", 14)
-            pdf.set_text_color(20, 30, 50)
-            pdf.cell(0, 10, "Pagamento da 1ª Parcela", new_x="LMARGIN", new_y="NEXT", align="C")
-            pdf.ln(5)
-            
-            # Centralizar imagem 40x40
-            pdf.image(qr_image_path, x=85, w=40)
-            pdf.ln(45)
-            
-            pdf.set_font("helvetica", "", 10)
-            pdf.set_text_color(20, 30, 50)
-            pdf.cell(0, 6, "Ou utilize o código PIX Copia e Cola abaixo:", new_x="LMARGIN", new_y="NEXT", align="C")
+            pdf.ln(8)
+            pdf.set_font("helvetica", "B", 12)
+            pdf.set_text_color(30, 41, 59)
+            pdf.cell(0, 8, "Pagamento da 1ª Parcela", new_x="LMARGIN", new_y="NEXT", align="C")
             pdf.ln(2)
             
-            pdf.set_font("helvetica", "", 8)
-            pdf.set_text_color(100, 100, 100)
-            pdf.multi_cell(0, 5, primeira_parcela.chave_pix_copia_cola, align="C")
+            # Centralizar imagem 35x35
+            pdf.image(qr_image_path, x=87.5, w=35)
+            pdf.ln(38)
+            
+            pdf.set_font("helvetica", "", 9)
+            pdf.set_text_color(100, 116, 139)
+            pdf.cell(0, 5, "Ou utilize o código PIX Copia e Cola abaixo:", new_x="LMARGIN", new_y="NEXT", align="C")
+            pdf.ln(1)
+            
+            pdf.set_font("helvetica", "", 7)
+            pdf.set_text_color(148, 163, 184)
+            pdf.multi_cell(0, 4, primeira_parcela.chave_pix_copia_cola, align="C")
             
             os.remove(qr_image_path)
         except Exception as e:
