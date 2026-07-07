@@ -253,9 +253,9 @@ def inscrever():
                 {
                     "type": "body",
                     "parameters": [
-                        {"type": "text", "text": str(nome_completo)},
-                        {"type": "text", "text": "Jantar de Casais DEFAD"},
-                        {"type": "text", "text": "wa.me/558382069331"}
+                        {"type": "text", "name": "nome_inscrito", "text": str(nome_completo)},
+                        {"type": "text", "name": "nome_evento", "text": "Jantar de Casais DEFAD"},
+                        {"type": "text", "name": "link_whatsapp", "text": "wa.me/558382069331"}
                     ]
                 }
             ]
@@ -512,12 +512,12 @@ def cobrar_manual(id):
             {
                 "type": "body",
                 "parameters": [
-                    {"type": "text", "text": str(inscricao.nome_completo)},
-                    {"type": "text", "text": str(p.numero_parcela)},
-                    {"type": "text", "text": f"{p.valor_parcela:.2f}"},
-                    {"type": "text", "text": "Jantar de Casais DEFAD"},
-                    {"type": "text", "text": p.data_vencimento.strftime('%d/%m/%Y')},
-                    {"type": "text", "text": "wa.me/558382069331"}
+                    {"type": "text", "name": "nome_inscrito", "text": str(inscricao.nome_completo)},
+                    {"type": "text", "name": "numero_parcela", "text": str(p.numero_parcela)},
+                    {"type": "text", "name": "valor_parcela", "text": f"{p.valor_parcela:.2f}"},
+                    {"type": "text", "name": "nome_evento", "text": "Jantar de Casais DEFAD"},
+                    {"type": "text", "name": "data_vencimento", "text": p.data_vencimento.strftime('%d/%m/%Y')},
+                    {"type": "text", "name": "link_whatsapp", "text": "wa.me/558382069331"}
                 ]
             }
         ]
