@@ -483,11 +483,17 @@ def cobrar_manual(id):
     telefone = inscricao.telefone
     
     try:
-        from whatsapp import send_message, send_template
+        import requests
+        from whatsapp import send_message, send_template, upload_media
         import urllib.parse
         
         pix_encoded = urllib.parse.quote(p.chave_pix_copia_cola)
         qr_url = f"https://api.qrserver.com/v1/create-qr-code/?size=300x300&data={pix_encoded}"
+        
+        # Meta API muitas vezes rejeita links de imagem em templates se não terminarem com extensão válida.
+        # Por isso, baixamos a imagem e fazemos o upload manualmente.
+        qr_response = requests.get(qr_url)
+        media_id = upload_media(qr_response.content, "qrcode.png", "image/png")
         
         components = [
             {
@@ -496,6 +502,8 @@ def cobrar_manual(id):
                     {
                         "type": "image",
                         "image": {
+                            "id": media_id
+                        } if media_id else {
                             "link": qr_url
                         }
                     }

@@ -96,8 +96,25 @@ def send_template(phone, template_name, language_code="pt_BR", components=None):
         return None
 
 def send_image_by_url(phone, image_url, caption=""):
-    """Envia uma imagem por URL (Requer janela de 24h aberta)"""
-    url = f"{API_URL}/messages"
+    """Envia uma imagem baixando-a da URL e fazendo upload, para evitar erros da Meta"""
+    import requests
+    
+    # Baixa a imagem
+    try:
+        response = requests.get(image_url)
+        response.raise_for_status()
+        file_bytes = response.content
+    except Exception as e:
+        print(f"Erro ao baixar imagem de {image_url}: {e}")
+        return None
+
+    # Faz upload
+    media_id = upload_media(file_bytes, "imagem.png", "image/png")
+    if not media_id:
+        print("Falha ao fazer upload da imagem para a Meta.")
+        return None
+
+    url_msg = f"{API_URL}/messages"
     
     payload = {
         "messaging_product": "whatsapp",
@@ -105,7 +122,7 @@ def send_image_by_url(phone, image_url, caption=""):
         "to": format_phone_number(phone),
         "type": "image",
         "image": {
-            "link": image_url,
+            "id": media_id,
             "caption": caption
         }
     }
@@ -115,11 +132,11 @@ def send_image_by_url(phone, image_url, caption=""):
     }
     
     try:
-        response = requests.post(url, headers=headers, json=payload)
-        response.raise_for_status()
-        return response.json()
+        res = requests.post(url_msg, headers=headers, json=payload)
+        res.raise_for_status()
+        return res.json()
     except Exception as e:
-        print(f"Erro ao enviar QR Code WhatsApp para {phone}: {e}")
+        print(f"Erro ao enviar QR Code/Imagem WhatsApp para {phone}: {e}")
         if hasattr(e, 'response') and e.response is not None:
             print("Detalhes do erro Meta:", e.response.text)
         return None
