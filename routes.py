@@ -1006,8 +1006,15 @@ def webhook():
                             
                             if 'PIX' in text_body and 'COLA' in text_body:
                                 from models import Inscricao
-                                phone_without_country = phone_number[2:] if phone_number.startswith('55') else phone_number
-                                inscricao = Inscricao.query.filter(Inscricao.telefone.like(f"%{phone_without_country}%")).first()
+                                phone_last8 = phone_number[-8:]
+                                
+                                inscricoes = Inscricao.query.all()
+                                inscricao = None
+                                for i in inscricoes:
+                                    telefone_limpo = ''.join(c for c in str(i.telefone) if c.isdigit())
+                                    if phone_last8 in telefone_limpo:
+                                        inscricao = i
+                                        break
                                 
                                 if inscricao:
                                     parcelas_pendentes = [p for p in inscricao.parcelas if p.status_parcela == 'Pendente']
