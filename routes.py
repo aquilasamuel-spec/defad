@@ -1020,8 +1020,9 @@ def webhook():
                                     parcelas_pendentes = [p for p in inscricao.parcelas if p.status_parcela == 'Pendente']
                                     if parcelas_pendentes:
                                         parcela_atual = parcelas_pendentes[0]
-                                        pix_text = f"Aqui está o código PIX Copia e Cola da sua parcela {parcela_atual.numero_parcela}:\n\n{parcela_atual.chave_pix_copia_cola}"
-                                        send_message(phone_number, pix_text)
+                                        msg_intro = f"Aqui está o código PIX Copia e Cola da sua parcela {parcela_atual.numero_parcela}:"
+                                        send_message(phone_number, msg_intro)
+                                        send_message(phone_number, parcela_atual.chave_pix_copia_cola)
                                         return jsonify({'status': 'ok'}), 200
                                 
                                 # Fallback se não encontrar a parcela
