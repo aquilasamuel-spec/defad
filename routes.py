@@ -984,11 +984,46 @@ def webhook():
                     if phone_number:
                         try:
                             print(f"Recebido mensagem de: {phone_number}")
+                            msg_type = message.get('type')
+                            text_body = ""
+                            
+                            if msg_type == 'text':
+                                text_body = message.get('text', {}).get('body', '')
+                            elif msg_type == 'button':
+                                text_body = message.get('button', {}).get('text', '') + " " + message.get('button', {}).get('payload', '')
+                            elif msg_type == 'interactive':
+                                inter = message.get('interactive', {})
+                                if inter.get('type') == 'button_reply':
+                                    text_body = inter.get('button_reply', {}).get('title', '') + " " + inter.get('button_reply', {}).get('id', '')
+                            
+                            text_body = text_body.upper()
+                            
+                            # Fallback de segurança: se não achou texto, procura na string do JSON inteiro
+                            if not text_body and ('PIX' in str(message).upper() and 'COLA' in str(message).upper()):
+                                text_body = 'PIX COPIA E COLA'
+                            
                             from whatsapp import send_message
-                            # Enviar mensagem de redirecionamento para o humano
-                            msg_direcionamento = "Olá! Este é um número automatizado do sistema de inscrições.\n\nPara dúvidas ou atendimento humano, por favor entre em contato com nosso WhatsApp oficial:\n📲 wa.me/558382069331"
-                            res = send_message(phone_number, msg_direcionamento)
-                            print("Resposta do envio:", res)
+                            
+                            if 'PIX' in text_body and 'COLA' in text_body:
+                                from models import Inscricao
+                                phone_without_country = phone_number[2:] if phone_number.startswith('55') else phone_number
+                                inscricao = Inscricao.query.filter(Inscricao.telefone.like(f"%{phone_without_country}%")).first()
+                                
+                                if inscricao:
+                                    parcelas_pendentes = [p for p in inscricao.parcelas if p.status_parcela == 'Pendente']
+                                    if parcelas_pendentes:
+                                        parcela_atual = parcelas_pendentes[0]
+                                        pix_text = f"Aqui está o código PIX Copia e Cola da sua parcela {parcela_atual.numero_parcela}:\n\n{parcela_atual.chave_pix_copia_cola}"
+                                        send_message(phone_number, pix_text)
+                                        return jsonify({'status': 'ok'}), 200
+                                
+                                # Fallback se não encontrar a parcela
+                                send_message(phone_number, "Não encontramos nenhuma parcela pendente associada a este número. Fale com nosso atendimento: wa.me/558382069331")
+                            else:
+                                # Enviar mensagem de redirecionamento padrão para o humano
+                                msg_direcionamento = "Olá! Este é um número automatizado do sistema de inscrições.\n\nPara dúvidas ou atendimento humano, por favor entre em contato com nosso WhatsApp oficial:\n📲 wa.me/558382069331"
+                                res = send_message(phone_number, msg_direcionamento)
+                                print("Resposta do envio:", res)
                         except Exception as e:
                             print(f"Erro no webhook ao redirecionar: {e}")
                 else:
