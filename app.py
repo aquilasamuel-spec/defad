@@ -120,6 +120,45 @@ def logica_cobranca():
 
 def create_app():
     import os
+    from dotenv import load_dotenv
+    load_dotenv()
+    app = Flask(__name__)
+    app.config['SECRET_KEY'] = 'defad_secreto_2026'
+    # Se estiver rodando no Render (com persistent disk mapeado em /data)
+    if os.environ.get('RENDER'):
+        app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:////data/database.db'
+    else:
+        app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///database.db'
+        
+    app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+
+    db.init_app(app)
+    app.register_blueprint(bp)
+    
+    app.config['SCHEDULER_API_ENABLED'] = False
+    from flask_apscheduler import APScheduler
+    scheduler = APScheduler()
+    scheduler.init_app(app)
+
+    with app.app_context():
+        db.create_all()
+        
+        # Adiciona a nova coluna no banco caso ainda não exista (Garante que no Render vai atualizar automático)
+        try:
+            db.session.execute(db.text("ALTER TABLE inscricao ADD COLUMN data_ultima_cobranca DATE;"))
+            db.session.commit()
+            print("Coluna 'data_ultima_cobranca' adicionada com sucesso.")
+        except Exception as e:
+            # Se der erro, é porque a coluna já existe, então ignoramos.
+            db.session.rollback()
+
+        # Seeding inicial de produtos
+        from models import Produto
+        if not Produto.query.filter_by(identificador='jantar').first():
+            db.session.add(Produto(identificador='jantar', nome='Jantar', valor=250.0, vagas_totais=100))
+        if not Produto.query.filter_by(identificador='jantar_hotel').first():
+            db.session.add(Produto(identificador='jantar_hotel', nome='Jantar + Hotel', valor=480.0, vagas_totais=50))
+        db.session.commit()
     @app.cli.command("cobrar")
     def cobrar():
         """Busca parcelas vencendo ou atrasadas e envia cobrança via WhatsApp."""
