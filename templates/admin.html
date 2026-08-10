@@ -79,6 +79,16 @@
                 </div>
             </div>
         </div>
+        
+        <!-- BOTÃO DE COBRANÇAS AUTOMÁTICAS -->
+        <div class="mb-8 flex justify-end">
+            <form action="{{ url_for('main.admin_rodar_cobrancas') }}" method="POST" onsubmit="return confirm('Deseja acionar o robô agora para enviar as cobranças de todas as parcelas vencidas no dia de hoje?');">
+                <button type="submit" class="bg-gradient-to-r from-orange-500 to-red-600 hover:from-orange-600 hover:to-red-700 text-white font-bold py-3 px-6 rounded-lg shadow-md transition transform hover:-translate-y-1 flex items-center">
+                    <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                    Rodar Cobranças Diárias Agora
+                </button>
+            </form>
+        </div>
 
         <!-- SEÇÃO DE PRODUTOS E ESTOQUE DE VAGAS -->
         <div class="mb-10">
