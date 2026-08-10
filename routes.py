@@ -506,8 +506,18 @@ def admin_rodar_cobrancas():
         import os
         sys.path.append(os.path.dirname(__file__))
         from app import logica_cobranca
-        logica_cobranca()
-        flash('Rotina de cobranças diárias executada com sucesso! Todas as parcelas vencidas foram notificadas.', 'success')
+        from threading import Thread
+        from flask import current_app
+        
+        app_context = current_app._get_current_object()
+        
+        def run_in_background(app):
+            with app.app_context():
+                logica_cobranca()
+                
+        Thread(target=run_in_background, args=(app_context,)).start()
+        
+        flash('A rotina de cobranças diárias foi iniciada em segundo plano! Todas as parcelas vencidas serão notificadas em instantes.', 'success')
     except Exception as e:
         flash(f'Erro ao rodar cobranças: {e}', 'danger')
         
@@ -528,8 +538,18 @@ def api_cron_cobrancas(token):
         if os.path.dirname(__file__) not in sys.path:
             sys.path.append(os.path.dirname(__file__))
         from app import logica_cobranca
-        logica_cobranca()
-        return 'Cobranças rodadas com sucesso', 200
+        from threading import Thread
+        from flask import current_app
+        
+        app_context = current_app._get_current_object()
+        
+        def run_in_background(app):
+            with app.app_context():
+                logica_cobranca()
+                
+        Thread(target=run_in_background, args=(app_context,)).start()
+        
+        return 'Cobranças rodadas em segundo plano com sucesso', 200
     except Exception as e:
         return f'Erro: {e}', 500
 
