@@ -51,73 +51,75 @@ def create_app():
             db.session.add(Produto(identificador='jantar_hotel', nome='Jantar + Hotel', valor=480.0, vagas_totais=50))
         db.session.commit()
 
-    def logica_cobranca():
-        from models import ParcelaPagamento, Inscricao
-        from datetime import date
-        from whatsapp import send_message, send_template
-        import urllib.parse
+def logica_cobranca():
+    from models import ParcelaPagamento, Inscricao
+    from datetime import date
+    from whatsapp import send_message, send_template
+    import urllib.parse
+    
+    hoje = date.today()
+    # Busca todas as parcelas pendentes com vencimento hoje ou antes de hoje (atrasadas)
+    parcelas = ParcelaPagamento.query.filter(
+        ParcelaPagamento.status_parcela == 'Pendente',
+        ParcelaPagamento.data_vencimento <= hoje
+    ).all()
+    
+    print(f"[{hoje}] Encontradas {len(parcelas)} parcelas vencendo/vencidas hoje.")
+    
+    for p in parcelas:
+        inscricao = p.inscricao
         
-        hoje = date.today()
-        # Busca todas as parcelas pendentes com vencimento hoje ou antes de hoje (atrasadas)
-        parcelas = ParcelaPagamento.query.filter(
-            ParcelaPagamento.status_parcela == 'Pendente',
-            ParcelaPagamento.data_vencimento <= hoje
-        ).all()
+        # Evita cobrar a mesma pessoa duas vezes no mesmo dia
+        if inscricao.data_ultima_cobranca == hoje:
+            continue
+            
+        telefone = inscricao.telefone
         
-        print(f"[{hoje}] Encontradas {len(parcelas)} parcelas vencendo/vencidas hoje.")
+        import requests
+        from whatsapp import upload_media
         
-        for p in parcelas:
-            inscricao = p.inscricao
-            
-            # Evita cobrar a mesma pessoa duas vezes no mesmo dia
-            if inscricao.data_ultima_cobranca == hoje:
-                continue
-                
-            telefone = inscricao.telefone
-            
-            import requests
-            from whatsapp import upload_media
-            
-            pix_encoded = urllib.parse.quote(p.chave_pix_copia_cola)
-            qr_url = f"https://api.qrserver.com/v1/create-qr-code/?size=300x300&data={pix_encoded}"
-            
-            qr_response = requests.get(qr_url)
-            media_id = upload_media(qr_response.content, "qrcode.png", "image/png")
-            
-            components = [
-                {
-                    "type": "header",
-                    "parameters": [
-                        {
-                            "type": "image",
-                            "image": {
-                                "id": media_id
-                            } if media_id else {
-                                "link": qr_url
-                            }
+        pix_encoded = urllib.parse.quote(p.chave_pix_copia_cola)
+        qr_url = f"https://api.qrserver.com/v1/create-qr-code/?size=300x300&data={pix_encoded}"
+        
+        qr_response = requests.get(qr_url)
+        media_id = upload_media(qr_response.content, "qrcode.png", "image/png")
+        
+        components = [
+            {
+                "type": "header",
+                "parameters": [
+                    {
+                        "type": "image",
+                        "image": {
+                            "id": media_id
+                        } if media_id else {
+                            "link": qr_url
                         }
-                    ]
-                },
-                {
-                    "type": "body",
-                    "parameters": [
-                        {"type": "text", "parameter_name": "nome_inscrito", "text": str(inscricao.nome_completo)},
-                        {"type": "text", "parameter_name": "numero_parcela", "text": str(p.numero_parcela)},
-                        {"type": "text", "parameter_name": "valor_parcela", "text": f"{p.valor_parcela:.2f}"},
-                        {"type": "text", "parameter_name": "nome_evento", "text": "Jantar de Casais DEFAD"},
-                        {"type": "text", "parameter_name": "data_vencimento", "text": p.data_vencimento.strftime('%d/%m/%Y')},
-                        {"type": "text", "parameter_name": "link_whatsapp", "text": "wa.me/558382069331"}
-                    ]
-                }
-            ]
-            send_template(telefone, "cobranca_parcela", components=components)
-            
-            inscricao.data_ultima_cobranca = hoje
-            from models import db
-            db.session.commit()
-            
-            print(f"Cobrança enviada para {inscricao.nome_completo} ({telefone})")
+                    }
+                ]
+            },
+            {
+                "type": "body",
+                "parameters": [
+                    {"type": "text", "parameter_name": "nome_inscrito", "text": str(inscricao.nome_completo)},
+                    {"type": "text", "parameter_name": "numero_parcela", "text": str(p.numero_parcela)},
+                    {"type": "text", "parameter_name": "valor_parcela", "text": f"{p.valor_parcela:.2f}"},
+                    {"type": "text", "parameter_name": "nome_evento", "text": "Jantar de Casais DEFAD"},
+                    {"type": "text", "parameter_name": "data_vencimento", "text": p.data_vencimento.strftime('%d/%m/%Y')},
+                    {"type": "text", "parameter_name": "link_whatsapp", "text": "wa.me/558382069331"}
+                ]
+            }
+        ]
+        send_template(telefone, "cobranca_parcela", components=components)
+        
+        inscricao.data_ultima_cobranca = hoje
+        from models import db
+        db.session.commit()
+        
+        print(f"Cobrança enviada para {inscricao.nome_completo} ({telefone})")
 
+def create_app():
+    import os
     @app.cli.command("cobrar")
     def cobrar():
         """Busca parcelas vencendo ou atrasadas e envia cobrança via WhatsApp."""
