@@ -68,6 +68,11 @@ def create_app():
         
         for p in parcelas:
             inscricao = p.inscricao
+            
+            # Evita cobrar a mesma pessoa duas vezes no mesmo dia
+            if inscricao.data_ultima_cobranca == hoje:
+                continue
+                
             telefone = inscricao.telefone
             
             import requests

@@ -494,6 +494,45 @@ def pagar_parcela(id):
     flash(f'Parcela {parcela.numero_parcela} de {inscricao.nome_completo} confirmada!', 'success')
     return redirect(url_for('main.admin'))
 
+@bp.route('/admin/rodar_cobrancas', methods=['POST'])
+def admin_rodar_cobrancas():
+    if not session.get('admin_logged_in'):
+        return redirect(url_for('main.admin_login'))
+    
+    try:
+        # Import the function from app.py
+        # To avoid circular imports, we can run it safely here
+        import sys
+        import os
+        sys.path.append(os.path.dirname(__file__))
+        from app import logica_cobranca
+        logica_cobranca()
+        flash('Rotina de cobranças diárias executada com sucesso! Todas as parcelas vencidas foram notificadas.', 'success')
+    except Exception as e:
+        flash(f'Erro ao rodar cobranças: {e}', 'danger')
+        
+    return redirect(url_for('main.admin'))
+
+@bp.route('/api/cron/rodar_cobrancas/<token>', methods=['GET'])
+def api_cron_cobrancas(token):
+    # Token de segurança simples para evitar acessos não autorizados
+    # O ideal é colocar no .env como CRON_SECRET, mas para simplificar vamos usar um fixo forte
+    import os
+    secret = os.environ.get('CRON_SECRET', 'defad_cron_secreto_998877')
+    
+    if token != secret:
+        return 'Unauthorized', 401
+        
+    try:
+        import sys
+        if os.path.dirname(__file__) not in sys.path:
+            sys.path.append(os.path.dirname(__file__))
+        from app import logica_cobranca
+        logica_cobranca()
+        return 'Cobranças rodadas com sucesso', 200
+    except Exception as e:
+        return f'Erro: {e}', 500
+
 @bp.route('/admin/cobrar_manual/<int:id>', methods=['POST'])
 def cobrar_manual(id):
     if not session.get('admin_logged_in'):
