@@ -69,8 +69,8 @@ def logica_cobranca():
     for p in parcelas:
         inscricao = p.inscricao
         
-        # Evita cobrar a mesma pessoa duas vezes no mesmo dia
-        if inscricao.data_ultima_cobranca == hoje:
+        # Evita cobrar a mesma pessoa mais de uma vez por semana
+        if inscricao.data_ultima_cobranca and (hoje - inscricao.data_ultima_cobranca).days < 7:
             continue
             
         telefone = inscricao.telefone
