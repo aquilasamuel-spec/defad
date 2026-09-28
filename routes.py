@@ -872,6 +872,17 @@ def editar_inscricao(id):
                     
             except Exception as e:
                 print("Erro ao enviar WhatsApp de atualização:", e)
+    else:
+        # Atualiza a data de vencimento de parcelas específicas se for o caso
+        for p in inscricao.parcelas:
+            nova_data_str = request.form.get(f'data_venc_parcela_{p.id}')
+            if nova_data_str:
+                try:
+                    nova_data = datetime.strptime(nova_data_str, '%Y-%m-%d').date()
+                    if nova_data != p.data_vencimento:
+                        p.data_vencimento = nova_data
+                except:
+                    pass
             
     db.session.commit()
     flash(f'Inscrição de {inscricao.nome_completo} atualizada com sucesso!', 'success')
