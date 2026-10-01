@@ -1073,7 +1073,13 @@ def webhook():
                                 text_body = 'PIX COPIA E COLA'
                             
                             from whatsapp import send_message
-                            
+
+                            # As conversas são conduzidas pelo Hub de atendimento (bot/IA + Chatwoot).
+                            # O defad só responde aos botões dos SEUS templates (tipo "button"),
+                            # que o Hub deixa para o sistema que enviou o template.
+                            if msg_type != 'button':
+                                return jsonify({'status': 'ok'}), 200
+
                             if 'PIX' in text_body and 'COLA' in text_body:
                                 from models import Inscricao
                                 phone_last8 = phone_number[-8:]
@@ -1097,11 +1103,8 @@ def webhook():
                                 
                                 # Fallback se não encontrar a parcela
                                 send_message(phone_number, "Não encontramos nenhuma parcela pendente associada a este número. Fale com nosso atendimento: wa.me/558382069331")
-                            else:
-                                # Enviar mensagem de redirecionamento padrão para o humano
-                                msg_direcionamento = "Olá! Este é um número automatizado do sistema de inscrições.\n\nPara dúvidas ou atendimento humano, por favor entre em contato com nosso WhatsApp oficial:\n📲 wa.me/558382069331"
-                                res = send_message(phone_number, msg_direcionamento)
-                                print("Resposta do envio:", res)
+                            # Outros botões de template: o defad não responde; a mensagem já fica
+                            # registrada no Chatwoot pelo Hub para o atendente.
                         except Exception as e:
                             print(f"Erro no webhook ao redirecionar: {e}")
                 else:
