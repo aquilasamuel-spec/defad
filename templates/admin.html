@@ -107,9 +107,9 @@
         <!-- BOTÕES DE DISPAROS -->
         <div class="mb-8 flex flex-wrap justify-end gap-3">
             {% if total_sinalizadas %}
-            <div class="flex items-center px-4 py-3 rounded-lg bg-red-50 border border-red-200 text-red-800 text-sm font-semibold">
-                ⚠️ {{ total_sinalizadas }} inscrição(ões) sinalizada(s) para retirada (responderam "Não")
-            </div>
+            <button type="button" onclick="filtrarSinalizadas()" title="Clique para listar só essas inscrições" class="flex items-center px-4 py-3 rounded-lg bg-red-50 hover:bg-red-100 border border-red-200 text-red-800 text-sm font-semibold transition cursor-pointer">
+                ⚠️ {{ total_sinalizadas }} inscrição(ões) sinalizada(s) para retirada (responderam "Não") — ver lista
+            </button>
             {% endif %}
             <form action="{{ url_for('main.admin_enviar_confirmacao_presenca') }}" method="POST" onsubmit="return confirm('Enviar a pergunta \'Ainda vai participar do {{ evento_nome }}, no dia {{ evento_data }}?\' (botões Sim/Não) para {{ total_para_confirmar }} inscrito(s) que não pagaram nenhuma parcela?');">
                 <button type="submit" {% if not total_para_confirmar %}disabled{% endif %} class="bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold py-3 px-6 rounded-lg shadow-md transition transform hover:-translate-y-1 flex items-center">
@@ -228,7 +228,13 @@
 
         <!-- LISTA DE INSCRITOS -->
         <div class="flex flex-col sm:flex-row sm:justify-between sm:items-end gap-4 mb-6">
-            <h2 class="text-2xl font-bold text-gray-900">👥 Inscritos Recentes</h2>
+            <div>
+                <h2 id="tituloInscritos" class="text-2xl font-bold text-gray-900">👥 Inscritos Recentes</h2>
+                <div id="avisoFiltroSinalizadas" class="hidden mt-2 inline-flex items-center gap-3 px-3 py-1 rounded-lg bg-red-50 border border-red-200 text-red-800 text-sm font-semibold">
+                    Mostrando só quem respondeu "Não" (sinalizados para retirada)
+                    <button type="button" onclick="limparFiltroSinalizadas()" class="underline hover:text-red-900">Mostrar todos</button>
+                </div>
+            </div>
             <div class="flex space-x-4 items-center">
                 <input type="text" id="searchInput" onkeyup="filterTable()" placeholder="Pesquisar por nome ou telefone..." class="px-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500 min-w-[250px]">
                 <a href="{{ url_for('main.exportar_pdf') }}" class="inline-flex items-center px-4 py-2 bg-gray-800 text-white text-sm font-medium rounded-lg hover:bg-gray-900 shadow-sm transition">
@@ -251,7 +257,7 @@
                     </thead>
                     <tbody class="bg-white divide-y divide-gray-200">
                         {% for i in inscricoes %}
-                        <tr data-telefone="{{ i.telefone }}" class="{% if i.sinalizada_exclusao %}bg-red-50 {% endif %}hover:bg-gray-50 transition">
+                        <tr data-telefone="{{ i.telefone }}" data-sinalizada="{{ 1 if i.sinalizada_exclusao else 0 }}" class="{% if i.sinalizada_exclusao %}bg-red-50 {% endif %}hover:bg-gray-50 transition">
                             <td class="px-6 py-4 whitespace-nowrap">
                                 <div class="text-sm font-bold text-gray-900">#{{ i.id }}</div>
                                 <div class="text-xs text-gray-500">{{ i.data_inscricao.strftime('%d/%m/%Y %H:%M') }}</div>
@@ -558,6 +564,22 @@
             }
         }
 
+        var somenteSinalizadas = false;
+
+        function filtrarSinalizadas() {
+            somenteSinalizadas = true;
+            document.getElementById("searchInput").value = "";
+            document.getElementById("avisoFiltroSinalizadas").classList.remove("hidden");
+            filterTable();
+            document.getElementById("tituloInscritos").scrollIntoView({behavior: "smooth", block: "start"});
+        }
+
+        function limparFiltroSinalizadas() {
+            somenteSinalizadas = false;
+            document.getElementById("avisoFiltroSinalizadas").classList.add("hidden");
+            filterTable();
+        }
+
         function filterTable() {
             var filter = document.getElementById("searchInput").value.trim().toUpperCase();
             // Telefone: compara só os últimos 8 dígitos, para achar o número
@@ -572,6 +594,7 @@
                 var texto = (td.textContent || td.innerText).toUpperCase();
                 var tel = (tr[i].getAttribute("data-telefone") || "").replace(/\D/g, "");
                 var achou = texto.indexOf(filter) > -1 || (buscaTelefone && tel.indexOf(buscaTelefone) > -1);
+                if (somenteSinalizadas && tr[i].getAttribute("data-sinalizada") !== "1") achou = false;
                 tr[i].style.display = achou ? "" : "none";
             }
         }
