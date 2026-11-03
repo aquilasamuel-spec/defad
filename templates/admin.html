@@ -80,6 +80,25 @@
             </div>
         </div>
         
+        <!-- SITUAÇÃO DE PAGAMENTO DOS INSCRITOS -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+            <div class="bg-white rounded-2xl shadow-sm border border-red-100 p-6">
+                <p class="text-sm font-semibold text-gray-500 uppercase">Não pagaram nenhuma parcela</p>
+                <p class="text-4xl font-extrabold text-red-600 mt-2">{{ qtd_sem_pagamento }}</p>
+                <p class="text-xs text-gray-400 mt-1">de {{ total_inscritos }} inscrito(s)</p>
+            </div>
+            <div class="bg-white rounded-2xl shadow-sm border border-yellow-100 p-6">
+                <p class="text-sm font-semibold text-gray-500 uppercase">Pagaram parcial</p>
+                <p class="text-4xl font-extrabold text-yellow-600 mt-2">{{ qtd_pago_parcial }}</p>
+                <p class="text-xs text-gray-400 mt-1">de {{ total_inscritos }} inscrito(s)</p>
+            </div>
+            <div class="bg-white rounded-2xl shadow-sm border border-green-100 p-6">
+                <p class="text-sm font-semibold text-gray-500 uppercase">Pagaram tudo</p>
+                <p class="text-4xl font-extrabold text-green-600 mt-2">{{ qtd_pago_total }}</p>
+                <p class="text-xs text-gray-400 mt-1">de {{ total_inscritos }} inscrito(s)</p>
+            </div>
+        </div>
+
         <!-- BOTÕES DE DISPAROS -->
         <div class="mb-8 flex flex-wrap justify-end gap-3">
             {% if total_sinalizadas %}
