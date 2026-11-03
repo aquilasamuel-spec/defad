@@ -152,6 +152,19 @@ def create_app():
             # Se der erro, é porque a coluna já existe, então ignoramos.
             db.session.rollback()
 
+        # Colunas da confirmação de presença (adicionadas automaticamente em bancos existentes)
+        for ddl in (
+            "ALTER TABLE inscricao ADD COLUMN confirmacao_presenca VARCHAR(20);",
+            "ALTER TABLE inscricao ADD COLUMN confirmacao_enviada_em DATETIME;",
+            "ALTER TABLE inscricao ADD COLUMN confirmacao_respondida_em DATETIME;",
+            "ALTER TABLE inscricao ADD COLUMN sinalizada_exclusao BOOLEAN NOT NULL DEFAULT 0;",
+        ):
+            try:
+                db.session.execute(db.text(ddl))
+                db.session.commit()
+            except Exception:
+                db.session.rollback()
+
         # Seeding inicial de produtos
         from models import Produto
         if not Produto.query.filter_by(identificador='jantar').first():
@@ -163,6 +176,12 @@ def create_app():
     def cobrar():
         """Busca parcelas vencendo ou atrasadas e envia cobrança via WhatsApp."""
         logica_cobranca()
+
+    @app.cli.command("confirmar_presenca")
+    def confirmar_presenca():
+        """Envia a pergunta de confirmação de presença para quem não pagou nenhuma parcela."""
+        from routes import logica_confirmacao_presenca
+        logica_confirmacao_presenca()
 
     # Tarefa automática rodando 1x ao dia, por exemplo, às 08:00
     @scheduler.task('cron', id='cobrar_automaticamente', hour=8, minute=0)

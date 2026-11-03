@@ -27,6 +27,16 @@ class Inscricao(db.Model):
     status_geral = db.Column(db.String(50), default='Pendente') # 'Pendente', 'Pago Parcial', 'Pago Total'
     data_inscricao = db.Column(db.DateTime, default=datetime.utcnow)
     data_ultima_cobranca = db.Column(db.Date, nullable=True)
+    # Confirmação de presença via WhatsApp: None (não enviada), 'Aguardando', 'Sim' ou 'Não'
+    confirmacao_presenca = db.Column(db.String(20), nullable=True)
+    confirmacao_enviada_em = db.Column(db.DateTime, nullable=True)
+    confirmacao_respondida_em = db.Column(db.DateTime, nullable=True)
+    # True quando o inscrito respondeu "Não": a inscrição deve ser retirada/excluída pelo admin
+    sinalizada_exclusao = db.Column(db.Boolean, default=False, nullable=False)
+
+    @property
+    def pagou_alguma_parcela(self):
+        return any(p.status_parcela == 'Pago' for p in self.parcelas)
 
     parcelas = db.relationship('ParcelaPagamento', backref='inscricao', lazy=True, cascade="all, delete-orphan")
 

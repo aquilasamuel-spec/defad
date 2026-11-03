@@ -80,8 +80,19 @@
             </div>
         </div>
         
-        <!-- BOTÃO DE COBRANÇAS AUTOMÁTICAS -->
-        <div class="mb-8 flex justify-end">
+        <!-- BOTÕES DE DISPAROS -->
+        <div class="mb-8 flex flex-wrap justify-end gap-3">
+            {% if total_sinalizadas %}
+            <div class="flex items-center px-4 py-3 rounded-lg bg-red-50 border border-red-200 text-red-800 text-sm font-semibold">
+                ⚠️ {{ total_sinalizadas }} inscrição(ões) sinalizada(s) para retirada (responderam "Não")
+            </div>
+            {% endif %}
+            <form action="{{ url_for('main.admin_enviar_confirmacao_presenca') }}" method="POST" onsubmit="return confirm('Enviar a pergunta \'Ainda vai participar do {{ evento_nome }}, no dia {{ evento_data }}?\' (botões Sim/Não) para {{ total_para_confirmar }} inscrito(s) que não pagaram nenhuma parcela?');">
+                <button type="submit" {% if not total_para_confirmar %}disabled{% endif %} class="bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold py-3 px-6 rounded-lg shadow-md transition transform hover:-translate-y-1 flex items-center">
+                    <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path></svg>
+                    Confirmar Presença (sem pagamento: {{ total_para_confirmar }})
+                </button>
+            </form>
             <form action="{{ url_for('main.admin_rodar_cobrancas') }}" method="POST" onsubmit="return confirm('Deseja acionar o robô agora para enviar as cobranças de todas as parcelas vencidas no dia de hoje?');">
                 <button type="submit" class="bg-gradient-to-r from-orange-500 to-red-600 hover:from-orange-600 hover:to-red-700 text-white font-bold py-3 px-6 rounded-lg shadow-md transition transform hover:-translate-y-1 flex items-center">
                     <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
@@ -216,7 +227,7 @@
                     </thead>
                     <tbody class="bg-white divide-y divide-gray-200">
                         {% for i in inscricoes %}
-                        <tr class="hover:bg-gray-50 transition">
+                        <tr class="{% if i.sinalizada_exclusao %}bg-red-50 {% endif %}hover:bg-gray-50 transition">
                             <td class="px-6 py-4 whitespace-nowrap">
                                 <div class="text-sm font-bold text-gray-900">#{{ i.id }}</div>
                                 <div class="text-xs text-gray-500">{{ i.data_inscricao.strftime('%d/%m/%Y %H:%M') }}</div>
@@ -249,6 +260,25 @@
                                 {% else %}
                                     <span class="px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-red-100 text-red-800">Pendente</span>
                                 {% endif %}
+                                {% if i.sinalizada_exclusao %}
+                                <div class="mt-2">
+                                    <span class="inline-flex items-center px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-white bg-red-600 rounded" title="Respondeu em {{ i.confirmacao_respondida_em.strftime('%d/%m/%Y %H:%M') if i.confirmacao_respondida_em else '-' }}">
+                                        ✗ Não vai — Retirar
+                                    </span>
+                                </div>
+                                {% elif i.confirmacao_presenca == 'Sim' %}
+                                <div class="mt-2">
+                                    <span class="inline-flex items-center px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-green-700 bg-green-100 border border-green-200 rounded">
+                                        ✓ Presença confirmada
+                                    </span>
+                                </div>
+                                {% elif i.confirmacao_presenca == 'Aguardando' %}
+                                <div class="mt-2">
+                                    <span class="inline-flex items-center px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-gray-600 bg-gray-100 border border-gray-200 rounded" title="Enviada em {{ i.confirmacao_enviada_em.strftime('%d/%m/%Y %H:%M') if i.confirmacao_enviada_em else '-' }}">
+                                        ⏳ Aguardando resposta
+                                    </span>
+                                </div>
+                                {% endif %}
                             </td>
                             <td class="px-6 py-4">
                                 <div class="space-y-2">
@@ -278,6 +308,19 @@
                                     <form action="{{ url_for('main.cobrar_manual', id=i.id) }}" method="POST" class="inline">
                                         <button type="submit" class="inline-flex items-center text-xs font-semibold text-green-700 hover:text-green-900 transition bg-green-50 hover:bg-green-100 border border-green-200 px-2 py-1 rounded-md" onclick="return confirm('Deseja enviar uma mensagem de cobrança agora para este cliente?')">
                                             Cobrar Agora
+                                        </button>
+                                    </form>
+                                    {% endif %}
+                                    {% if i.sinalizada_exclusao %}
+                                    <form action="{{ url_for('main.admin_remover_sinalizacao', id=i.id) }}" method="POST" class="inline">
+                                        <button type="submit" class="inline-flex items-center text-xs font-semibold text-gray-700 hover:text-gray-900 transition bg-gray-50 hover:bg-gray-100 border border-gray-200 px-2 py-1 rounded-md" onclick="return confirm('Remover a sinalização de retirada desta inscrição?')">
+                                            Manter Inscrição
+                                        </button>
+                                    </form>
+                                    {% elif not i.pagou_alguma_parcela and i.confirmacao_presenca != 'Sim' %}
+                                    <form action="{{ url_for('main.admin_confirmacao_individual', id=i.id) }}" method="POST" class="inline">
+                                        <button type="submit" class="inline-flex items-center text-xs font-semibold text-indigo-700 hover:text-indigo-900 transition bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 px-2 py-1 rounded-md" onclick="return confirm('Enviar a pergunta de confirmação de presença (Sim/Não) para este inscrito?')">
+                                            Perguntar Presença
                                         </button>
                                     </form>
                                     {% endif %}

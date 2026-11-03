@@ -24,6 +24,7 @@ DESCRICAO_TEMPLATES = {
     'inscricao_solicitada': 'Inscrição solicitada (comprovante em PDF)',
     'inscricao_finalizada': 'Inscrição finalizada',
     'parcelas_pagas': 'Confirmação de pagamento',
+    'confirmacao_presenca': 'Pergunta de confirmação de presença (Sim/Não)',
 }
 ROTULOS_PARAMETROS = {
     'nome_inscrito': 'Inscrito',
@@ -32,6 +33,7 @@ ROTULOS_PARAMETROS = {
     'data_vencimento': 'Vencimento',
     'parcelas_pagas_agora': 'Parcela(s) paga(s)',
     'lista_parcelas': 'Parcelas',
+    'data_evento': 'Data do evento',
 }
 PARAMETROS_IGNORADOS = {'nome_evento', 'link_whatsapp'}
 
