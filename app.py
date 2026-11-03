@@ -106,7 +106,7 @@ def logica_cobranca():
                     {"type": "text", "parameter_name": "valor_parcela", "text": f"{p.valor_parcela:.2f}"},
                     {"type": "text", "parameter_name": "nome_evento", "text": "Jantar de Casais DEFAD"},
                     {"type": "text", "parameter_name": "data_vencimento", "text": p.data_vencimento.strftime('%d/%m/%Y')},
-                    {"type": "text", "parameter_name": "link_whatsapp", "text": "wa.me/558382069331"}
+                    {"type": "text", "parameter_name": "link_whatsapp", "text": "responda esta mensagem"}
                 ]
             }
         ]

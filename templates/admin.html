@@ -81,11 +81,16 @@
         </div>
         
         <!-- SITUAÇÃO DE PAGAMENTO DOS INSCRITOS -->
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
             <div class="bg-white rounded-2xl shadow-sm border border-red-100 p-6">
                 <p class="text-sm font-semibold text-gray-500 uppercase">Não pagaram nenhuma parcela</p>
                 <p class="text-4xl font-extrabold text-red-600 mt-2">{{ qtd_sem_pagamento }}</p>
                 <p class="text-xs text-gray-400 mt-1">de {{ total_inscritos }} inscrito(s)</p>
+            </div>
+            <div class="bg-white rounded-2xl shadow-sm border border-blue-100 p-6">
+                <p class="text-sm font-semibold text-gray-500 uppercase">Sem pagamento que confirmaram presença</p>
+                <p class="text-4xl font-extrabold text-blue-600 mt-2">{{ qtd_sem_pag_confirmaram }}</p>
+                <p class="text-xs text-gray-400 mt-1">de {{ qtd_sem_pagamento }} sem pagamento · {{ qtd_sem_pag_aguardando }} aguardando · {{ qtd_sem_pag_nao_vao }} não vão</p>
             </div>
             <div class="bg-white rounded-2xl shadow-sm border border-yellow-100 p-6">
                 <p class="text-sm font-semibold text-gray-500 uppercase">Pagaram parcial</p>

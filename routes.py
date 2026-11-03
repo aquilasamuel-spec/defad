@@ -294,7 +294,7 @@ def inscrever():
                     "parameters": [
                         {"type": "text", "parameter_name": "nome_inscrito", "text": str(nome_completo)},
                         {"type": "text", "parameter_name": "nome_evento", "text": "Jantar de Casais DEFAD"},
-                        {"type": "text", "parameter_name": "link_whatsapp", "text": "wa.me/558382069331"}
+                        {"type": "text", "parameter_name": "link_whatsapp", "text": "responda esta mensagem"}
                     ]
                 }
             ]
@@ -362,6 +362,9 @@ def admin():
                            total_saidas=total_saidas,
                            meses_disponiveis=meses_disponiveis,
                            qtd_sem_pagamento=sum(1 for i in inscricoes if not i.pagou_alguma_parcela),
+                           qtd_sem_pag_confirmaram=sum(1 for i in inscricoes if not i.pagou_alguma_parcela and i.confirmacao_presenca == 'Sim'),
+                           qtd_sem_pag_aguardando=sum(1 for i in inscricoes if not i.pagou_alguma_parcela and i.confirmacao_presenca == 'Aguardando'),
+                           qtd_sem_pag_nao_vao=sum(1 for i in inscricoes if not i.pagou_alguma_parcela and i.confirmacao_presenca == 'Não'),
                            qtd_pago_total=sum(1 for i in inscricoes if i.parcelas and all(p.status_parcela == 'Pago' for p in i.parcelas)),
                            qtd_pago_parcial=sum(1 for i in inscricoes if i.pagou_alguma_parcela and not all(p.status_parcela == 'Pago' for p in i.parcelas)),
                            total_para_confirmar=len(inscricoes_para_confirmar()),
@@ -612,7 +615,7 @@ def cobrar_manual(id):
                     {"type": "text", "parameter_name": "valor_parcela", "text": f"{p.valor_parcela:.2f}"},
                     {"type": "text", "parameter_name": "nome_evento", "text": "Jantar de Casais DEFAD"},
                     {"type": "text", "parameter_name": "data_vencimento", "text": p.data_vencimento.strftime('%d/%m/%Y')},
-                    {"type": "text", "parameter_name": "link_whatsapp", "text": "wa.me/558382069331"}
+                    {"type": "text", "parameter_name": "link_whatsapp", "text": "responda esta mensagem"}
                 ]
             }
         ]
@@ -702,10 +705,10 @@ def registrar_resposta_presenca(inscricao, resposta, phone_number):
 
     if resposta == 'Sim':
         send_message(phone_number, f"Que bom, {inscricao.nome_completo}! Sua presença no {EVENTO_NOME} do dia {EVENTO_DATA} está confirmada. 🙏\n"
-                                   "Para garantir sua vaga, não esqueça de efetuar o pagamento. Dúvidas: wa.me/558382069331")
+                                   "Para garantir sua vaga, não esqueça de efetuar o pagamento. Em caso de dúvidas, é só responder esta mensagem.")
     else:
         send_message(phone_number, f"Tudo bem, {inscricao.nome_completo}. Registramos que vocês não vão participar do {EVENTO_NOME} e sua inscrição será cancelada.\n"
-                                   "Se mudar de ideia, fale com nosso atendimento: wa.me/558382069331")
+                                   "Se mudar de ideia, é só responder esta mensagem.")
 
 
 def buscar_inscricao_por_telefone(phone_number, apenas_aguardando=False):
@@ -1279,7 +1282,7 @@ def webhook():
                                         return jsonify({'status': 'ok'}), 200
                                 
                                 # Fallback se não encontrar a parcela
-                                send_message(phone_number, "Não encontramos nenhuma parcela pendente associada a este número. Fale com nosso atendimento: wa.me/558382069331")
+                                send_message(phone_number, "Não encontramos nenhuma parcela pendente associada a este número. Em caso de dúvidas, é só responder esta mensagem.")
                             # Outros botões de template: o defad não responde; a mensagem já fica
                             # registrada no Chatwoot pelo Hub para o atendente.
                         except Exception as e:
