@@ -230,7 +230,7 @@
         <div class="flex flex-col sm:flex-row sm:justify-between sm:items-end gap-4 mb-6">
             <h2 class="text-2xl font-bold text-gray-900">👥 Inscritos Recentes</h2>
             <div class="flex space-x-4 items-center">
-                <input type="text" id="searchInput" onkeyup="filterTable()" placeholder="Pesquisar por nome..." class="px-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500 min-w-[250px]">
+                <input type="text" id="searchInput" onkeyup="filterTable()" placeholder="Pesquisar por nome ou telefone..." class="px-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500 min-w-[250px]">
                 <a href="{{ url_for('main.exportar_pdf') }}" class="inline-flex items-center px-4 py-2 bg-gray-800 text-white text-sm font-medium rounded-lg hover:bg-gray-900 shadow-sm transition">
                     <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
                     Exportar Inscritos (PDF)
@@ -251,7 +251,7 @@
                     </thead>
                     <tbody class="bg-white divide-y divide-gray-200">
                         {% for i in inscricoes %}
-                        <tr class="{% if i.sinalizada_exclusao %}bg-red-50 {% endif %}hover:bg-gray-50 transition">
+                        <tr data-telefone="{{ i.telefone }}" class="{% if i.sinalizada_exclusao %}bg-red-50 {% endif %}hover:bg-gray-50 transition">
                             <td class="px-6 py-4 whitespace-nowrap">
                                 <div class="text-sm font-bold text-gray-900">#{{ i.id }}</div>
                                 <div class="text-xs text-gray-500">{{ i.data_inscricao.strftime('%d/%m/%Y %H:%M') }}</div>
@@ -559,23 +559,20 @@
         }
 
         function filterTable() {
-            var input, filter, table, tr, td, i, txtValue;
-            input = document.getElementById("searchInput");
-            filter = input.value.toUpperCase();
-            table = document.getElementById("inscritosTable");
-            tr = table.getElementsByTagName("tr");
-            
-            // Loop through all table rows, and hide those who don't match the search query
-            for (i = 1; i < tr.length; i++) { // Skip the header row (i=0)
-                td = tr[i].getElementsByTagName("td")[1]; // Index 1 is the "Casal / Contato" column
-                if (td) {
-                    txtValue = td.textContent || td.innerText;
-                    if (txtValue.toUpperCase().indexOf(filter) > -1) {
-                        tr[i].style.display = "";
-                    } else {
-                        tr[i].style.display = "none";
-                    }
-                }
+            var filter = document.getElementById("searchInput").value.trim().toUpperCase();
+            // Telefone: compara só os últimos 8 dígitos, para achar o número
+            // com ou sem 55, DDD, 9º dígito, espaços, traços ou parênteses.
+            var digitos = filter.replace(/\D/g, "");
+            var buscaTelefone = digitos.length >= 8 ? digitos.slice(-8) : (digitos.length >= 4 && digitos.length === filter.replace(/[\s()+\-.]/g, "").length ? digitos : null);
+            var tr = document.getElementById("inscritosTable").getElementsByTagName("tr");
+
+            for (var i = 1; i < tr.length; i++) { // pula o cabeçalho
+                var td = tr[i].getElementsByTagName("td")[1]; // coluna "Casal / Contato"
+                if (!td) continue;
+                var texto = (td.textContent || td.innerText).toUpperCase();
+                var tel = (tr[i].getAttribute("data-telefone") || "").replace(/\D/g, "");
+                var achou = texto.indexOf(filter) > -1 || (buscaTelefone && tel.indexOf(buscaTelefone) > -1);
+                tr[i].style.display = achou ? "" : "none";
             }
         }
     </script>
