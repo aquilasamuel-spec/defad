@@ -632,9 +632,9 @@ def cobrar_manual(id):
 # ---------------------------------------------------------------------------
 # CONFIRMAÇÃO DE PRESENÇA (inscritos que ainda não pagaram nenhuma parcela)
 # ---------------------------------------------------------------------------
-# Template da Meta "confirmacao_presenca" (categoria Utilidade, pt_BR, parâmetros nomeados),
-# com 2 botões de RESPOSTA RÁPIDA: "Sim" (índice 0) e "Não" (índice 1).
-TEMPLATE_CONFIRMACAO = os.environ.get('TEMPLATE_CONFIRMACAO', 'confirmacao_presenca')
+# Template da Meta "status_inscricao_jantar" (categoria Utilidade, pt_BR, parâmetros nomeados),
+# com 2 botões de RESPOSTA RÁPIDA: "Sim, manter inscrição" (índice 0) e "Não, cancelar inscrição" (índice 1).
+TEMPLATE_CONFIRMACAO = os.environ.get('TEMPLATE_CONFIRMACAO', 'status_inscricao_jantar')
 EVENTO_NOME = os.environ.get('EVENTO_NOME', 'Jantar de Casais')
 EVENTO_DATA = os.environ.get('EVENTO_DATA', '28/11')
 PAYLOAD_SIM = 'PRESENCA_SIM'
@@ -657,6 +657,7 @@ def enviar_confirmacao_presenca(inscricao):
             "type": "body",
             "parameters": [
                 {"type": "text", "parameter_name": "nome_inscrito", "text": str(inscricao.nome_completo)},
+                {"type": "text", "parameter_name": "numero_inscricao", "text": str(inscricao.id)},
                 {"type": "text", "parameter_name": "nome_evento", "text": EVENTO_NOME},
                 {"type": "text", "parameter_name": "data_evento", "text": EVENTO_DATA},
             ]
@@ -731,12 +732,12 @@ def tratar_botao_presenca(message, phone_number):
             inscricao = Inscricao.query.get(int(id_txt))
         if not inscricao:
             inscricao = buscar_inscricao_por_telefone(phone_number)
-    elif texto in ('SIM', 'NÃO', 'NAO'):
+    elif texto.startswith(('SIM', 'NÃO', 'NAO')):
         # Fallback: botão sem payload conhecido -> usa o telefone de quem está aguardando resposta
         inscricao = buscar_inscricao_por_telefone(phone_number, apenas_aguardando=True)
         if not inscricao:
             return False
-        resposta = 'Sim' if texto == 'SIM' else 'Não'
+        resposta = 'Sim' if texto.startswith('SIM') else 'Não'
     else:
         return False
 
