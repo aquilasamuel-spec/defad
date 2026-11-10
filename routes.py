@@ -2,7 +2,6 @@ from flask import Blueprint, render_template, request, redirect, url_for, flash,
 from models import db, Inscricao, ParcelaPagamento, Produto, Saida
 from datetime import datetime, date
 from dateutil.relativedelta import relativedelta
-import os
 import random
 import string
 
@@ -294,7 +293,7 @@ def inscrever():
                     "parameters": [
                         {"type": "text", "parameter_name": "nome_inscrito", "text": str(nome_completo)},
                         {"type": "text", "parameter_name": "nome_evento", "text": "Jantar de Casais DEFAD"},
-                        {"type": "text", "parameter_name": "link_whatsapp", "text": "responda esta mensagem"}
+                        {"type": "text", "parameter_name": "link_whatsapp", "text": "wa.me/558382069331"}
                     ]
                 }
             ]
@@ -349,6 +348,9 @@ def admin():
     saidas = Saida.query.order_by(Saida.data_registro.desc()).all()
     total_saidas = sum(s.valor for s in saidas)
     
+    # Saldo em caixa: o que já foi efetivamente recebido menos as saídas
+    saldo_caixa = valor_arrecadado - total_saidas
+    
     max_parcelas = get_max_parcelas()
     meses_disponiveis = list(range(1, max_parcelas + 1))
     
@@ -360,17 +362,8 @@ def admin():
                            valor_arrecadado=valor_arrecadado,
                            valor_a_receber=valor_a_receber,
                            total_saidas=total_saidas,
+                           saldo_caixa=saldo_caixa,
                            meses_disponiveis=meses_disponiveis,
-                           qtd_sem_pagamento=sum(1 for i in inscricoes if not i.pagou_alguma_parcela),
-                           qtd_sem_pag_confirmaram=sum(1 for i in inscricoes if not i.pagou_alguma_parcela and i.confirmacao_presenca == 'Sim'),
-                           qtd_sem_pag_aguardando=sum(1 for i in inscricoes if not i.pagou_alguma_parcela and i.confirmacao_presenca == 'Aguardando'),
-                           qtd_sem_pag_nao_vao=sum(1 for i in inscricoes if not i.pagou_alguma_parcela and i.confirmacao_presenca == 'Não'),
-                           qtd_pago_total=sum(1 for i in inscricoes if i.parcelas and all(p.status_parcela == 'Pago' for p in i.parcelas)),
-                           qtd_pago_parcial=sum(1 for i in inscricoes if i.pagou_alguma_parcela and not all(p.status_parcela == 'Pago' for p in i.parcelas)),
-                           total_para_confirmar=len(inscricoes_para_confirmar()),
-                           total_sinalizadas=sum(1 for i in inscricoes if i.sinalizada_exclusao),
-                           evento_nome=EVENTO_NOME,
-                           evento_data=EVENTO_DATA,
                            hoje=date.today())
 
 @bp.route('/admin/produto/editar/<int:id>', methods=['POST'])
@@ -615,7 +608,7 @@ def cobrar_manual(id):
                     {"type": "text", "parameter_name": "valor_parcela", "text": f"{p.valor_parcela:.2f}"},
                     {"type": "text", "parameter_name": "nome_evento", "text": "Jantar de Casais DEFAD"},
                     {"type": "text", "parameter_name": "data_vencimento", "text": p.data_vencimento.strftime('%d/%m/%Y')},
-                    {"type": "text", "parameter_name": "link_whatsapp", "text": "responda esta mensagem"}
+                    {"type": "text", "parameter_name": "link_whatsapp", "text": "wa.me/558382069331"}
                 ]
             }
         ]
@@ -630,171 +623,6 @@ def cobrar_manual(id):
         print("Erro ao enviar cobrança manual:", e)
         flash('Erro ao enviar cobrança manual pelo WhatsApp.', 'error')
         
-    return redirect(url_for('main.admin'))
-
-# ---------------------------------------------------------------------------
-# CONFIRMAÇÃO DE PRESENÇA (inscritos que ainda não pagaram nenhuma parcela)
-# ---------------------------------------------------------------------------
-# Template da Meta "status_inscricao_jantar" (categoria Utilidade, pt_BR, parâmetros nomeados),
-# com 2 botões de RESPOSTA RÁPIDA: "Sim, manter inscrição" (índice 0) e "Não, cancelar inscrição" (índice 1).
-TEMPLATE_CONFIRMACAO = os.environ.get('TEMPLATE_CONFIRMACAO', 'status_inscricao_jantar')
-EVENTO_NOME = os.environ.get('EVENTO_NOME', 'Jantar de Casais')
-EVENTO_DATA = os.environ.get('EVENTO_DATA', '28/11')
-PAYLOAD_SIM = 'PRESENCA_SIM'
-PAYLOAD_NAO = 'PRESENCA_NAO'
-
-
-def inscricoes_para_confirmar():
-    """Inscritos sem nenhuma parcela paga e que ainda não responderam a confirmação."""
-    return [
-        i for i in Inscricao.query.order_by(Inscricao.id).all()
-        if not i.pagou_alguma_parcela and i.confirmacao_presenca not in ('Sim', 'Não')
-    ]
-
-
-def enviar_confirmacao_presenca(inscricao):
-    """Envia o template com os botões Sim/Não. Retorna True se a Meta aceitou o envio."""
-    from whatsapp import send_template
-    components = [
-        {
-            "type": "body",
-            "parameters": [
-                {"type": "text", "parameter_name": "nome_inscrito", "text": str(inscricao.nome_completo)},
-                {"type": "text", "parameter_name": "numero_inscricao", "text": str(inscricao.id)},
-                {"type": "text", "parameter_name": "nome_evento", "text": EVENTO_NOME},
-                {"type": "text", "parameter_name": "data_evento", "text": EVENTO_DATA},
-            ]
-        },
-        # O payload de cada botão leva o ID da inscrição, para identificar a resposta com segurança
-        {"type": "button", "sub_type": "quick_reply", "index": "0",
-         "parameters": [{"type": "payload", "payload": f"{PAYLOAD_SIM}_{inscricao.id}"}]},
-        {"type": "button", "sub_type": "quick_reply", "index": "1",
-         "parameters": [{"type": "payload", "payload": f"{PAYLOAD_NAO}_{inscricao.id}"}]},
-    ]
-    resposta = send_template(inscricao.telefone, TEMPLATE_CONFIRMACAO, components=components)
-    if resposta:
-        inscricao.confirmacao_presenca = 'Aguardando'
-        inscricao.confirmacao_enviada_em = datetime.now()
-        db.session.commit()
-        return True
-    return False
-
-
-def logica_confirmacao_presenca():
-    import time
-    alvos = inscricoes_para_confirmar()
-    enviados, falhas = 0, []
-    for i in alvos:
-        if enviar_confirmacao_presenca(i):
-            enviados += 1
-        else:
-            falhas.append(f"#{i.id} {i.nome_completo}")
-        time.sleep(0.3)  # não estourar o limite de envio da Meta
-    print(f"Confirmação de presença: {enviados} enviada(s), {len(falhas)} falha(s). {', '.join(falhas)}")
-    return enviados, falhas
-
-
-def registrar_resposta_presenca(inscricao, resposta, phone_number):
-    """Grava a resposta Sim/Não e responde ao inscrito (janela de 24h aberta pela resposta)."""
-    from whatsapp import send_message
-    inscricao.confirmacao_presenca = resposta
-    inscricao.confirmacao_respondida_em = datetime.now()
-    inscricao.sinalizada_exclusao = (resposta == 'Não')
-    db.session.commit()
-    print(f"Confirmação de presença: #{inscricao.id} {inscricao.nome_completo} respondeu {resposta}")
-
-    if resposta == 'Sim':
-        send_message(phone_number, f"Que bom, {inscricao.nome_completo}! Sua presença no {EVENTO_NOME} do dia {EVENTO_DATA} está confirmada. 🙏\n"
-                                   "Para garantir sua vaga, não esqueça de efetuar o pagamento. Em caso de dúvidas, é só responder esta mensagem.")
-    else:
-        send_message(phone_number, f"Tudo bem, {inscricao.nome_completo}. Registramos que vocês não vão participar do {EVENTO_NOME} e sua inscrição será cancelada.\n"
-                                   "Se mudar de ideia, é só responder esta mensagem.")
-
-
-def buscar_inscricao_por_telefone(phone_number, apenas_aguardando=False):
-    phone_last8 = ''.join(c for c in str(phone_number) if c.isdigit())[-8:]
-    for i in Inscricao.query.order_by(Inscricao.id.desc()).all():
-        if apenas_aguardando and i.confirmacao_presenca != 'Aguardando':
-            continue
-        if phone_last8 and phone_last8 in ''.join(c for c in str(i.telefone) if c.isdigit()):
-            return i
-    return None
-
-
-def tratar_botao_presenca(message, phone_number):
-    """Retorna True se a mensagem era uma resposta ao template de confirmação de presença."""
-    botao = message.get('button', {}) or {}
-    payload = (botao.get('payload') or '').upper()
-    texto = (botao.get('text') or '').strip().upper()
-
-    inscricao, resposta = None, None
-    if payload.startswith(PAYLOAD_SIM) or payload.startswith(PAYLOAD_NAO):
-        resposta = 'Sim' if payload.startswith(PAYLOAD_SIM) else 'Não'
-        id_txt = payload.rsplit('_', 1)[-1]
-        if id_txt.isdigit():
-            inscricao = Inscricao.query.get(int(id_txt))
-        if not inscricao:
-            inscricao = buscar_inscricao_por_telefone(phone_number)
-    elif texto.startswith(('SIM', 'NÃO', 'NAO')):
-        # Fallback: botão sem payload conhecido -> usa o telefone de quem está aguardando resposta
-        inscricao = buscar_inscricao_por_telefone(phone_number, apenas_aguardando=True)
-        if not inscricao:
-            return False
-        resposta = 'Sim' if texto.startswith('SIM') else 'Não'
-    else:
-        return False
-
-    if inscricao:
-        registrar_resposta_presenca(inscricao, resposta, phone_number)
-    else:
-        print(f"Resposta de presença de {phone_number} sem inscrição correspondente (payload={payload}).")
-    return True
-
-
-@bp.route('/admin/enviar_confirmacao_presenca', methods=['POST'])
-def admin_enviar_confirmacao_presenca():
-    if not session.get('admin_logged_in'):
-        return redirect(url_for('main.admin_login'))
-
-    total = len(inscricoes_para_confirmar())
-    if not total:
-        flash('Nenhum inscrito sem pagamento aguardando confirmação de presença.', 'error')
-        return redirect(url_for('main.admin'))
-
-    from threading import Thread
-    app_obj = current_app._get_current_object()
-
-    def run_in_background(app):
-        with app.app_context():
-            logica_confirmacao_presenca()
-
-    Thread(target=run_in_background, args=(app_obj,)).start()
-    flash(f'Enviando a pergunta de confirmação de presença para {total} inscrito(s) sem pagamento. '
-          'As respostas aparecerão na coluna "Status Geral".', 'success')
-    return redirect(url_for('main.admin'))
-
-
-@bp.route('/admin/confirmacao_presenca/<int:id>', methods=['POST'])
-def admin_confirmacao_individual(id):
-    if not session.get('admin_logged_in'):
-        return redirect(url_for('main.admin_login'))
-    inscricao = Inscricao.query.get_or_404(id)
-    if enviar_confirmacao_presenca(inscricao):
-        flash(f'Pergunta de confirmação enviada para {inscricao.nome_completo}.', 'success')
-    else:
-        flash(f'Falha ao enviar a confirmação para {inscricao.nome_completo}. Veja o meta_errors.log.', 'error')
-    return redirect(url_for('main.admin'))
-
-
-@bp.route('/admin/remover_sinalizacao/<int:id>', methods=['POST'])
-def admin_remover_sinalizacao(id):
-    if not session.get('admin_logged_in'):
-        return redirect(url_for('main.admin_login'))
-    inscricao = Inscricao.query.get_or_404(id)
-    inscricao.sinalizada_exclusao = False
-    inscricao.confirmacao_presenca = None
-    db.session.commit()
-    flash(f'Sinalização de retirada removida de {inscricao.nome_completo}.', 'success')
     return redirect(url_for('main.admin'))
 
 @bp.route('/admin/exportar_pdf')
@@ -1249,17 +1077,7 @@ def webhook():
                                 text_body = 'PIX COPIA E COLA'
                             
                             from whatsapp import send_message
-
-                            # As conversas são conduzidas pelo Hub de atendimento (bot/IA + Chatwoot).
-                            # O defad só responde aos botões dos SEUS templates (tipo "button"),
-                            # que o Hub deixa para o sistema que enviou o template.
-                            if msg_type != 'button':
-                                return jsonify({'status': 'ok'}), 200
-
-                            # Resposta Sim/Não do template de confirmação de presença
-                            if tratar_botao_presenca(message, phone_number):
-                                return jsonify({'status': 'ok'}), 200
-
+                            
                             if 'PIX' in text_body and 'COLA' in text_body:
                                 from models import Inscricao
                                 phone_last8 = phone_number[-8:]
@@ -1282,9 +1100,12 @@ def webhook():
                                         return jsonify({'status': 'ok'}), 200
                                 
                                 # Fallback se não encontrar a parcela
-                                send_message(phone_number, "Não encontramos nenhuma parcela pendente associada a este número. Em caso de dúvidas, é só responder esta mensagem.")
-                            # Outros botões de template: o defad não responde; a mensagem já fica
-                            # registrada no Chatwoot pelo Hub para o atendente.
+                                send_message(phone_number, "Não encontramos nenhuma parcela pendente associada a este número. Fale com nosso atendimento: wa.me/558382069331")
+                            else:
+                                # Enviar mensagem de redirecionamento padrão para o humano
+                                msg_direcionamento = "Olá! Este é um número automatizado do sistema de inscrições.\n\nPara dúvidas ou atendimento humano, por favor entre em contato com nosso WhatsApp oficial:\n📲 wa.me/558382069331"
+                                res = send_message(phone_number, msg_direcionamento)
+                                print("Resposta do envio:", res)
                         except Exception as e:
                             print(f"Erro no webhook ao redirecionar: {e}")
                 else:
