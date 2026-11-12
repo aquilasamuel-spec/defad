@@ -264,8 +264,12 @@
                     <button type="button" onclick="limparFiltroSinalizadas()" class="underline hover:text-red-900">Mostrar todos</button>
                 </div>
             </div>
-            <div class="flex space-x-4 items-center">
+            <div class="flex flex-wrap gap-3 items-center">
                 <input type="text" id="searchInput" onkeyup="filterTable()" placeholder="Pesquisar por nome ou telefone..." class="px-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500 min-w-[250px]">
+                <a href="{{ url_for('main.exportar_hotel') }}" class="inline-flex items-center px-4 py-2 bg-orange-600 text-white text-sm font-medium rounded-lg hover:bg-orange-700 shadow-sm transition" title="Lista dos casais Jantar + Hotel para enviar ao hotel">
+                    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v11m0-4h18m0 4v-8a3 3 0 00-3-3h-8v7M7 11a2 2 0 100-4 2 2 0 000 4z"></path></svg>
+                    Lista para o Hotel (PDF)
+                </a>
                 <a href="{{ url_for('main.exportar_pdf') }}" class="inline-flex items-center px-4 py-2 bg-gray-800 text-white text-sm font-medium rounded-lg hover:bg-gray-900 shadow-sm transition">
                     <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
                     Exportar Inscritos (PDF)

@@ -869,6 +869,110 @@ def exportar_pdf():
         download_name='relatorio_inscritos.pdf'
     )
 
+@bp.route('/admin/exportar_hotel')
+def exportar_hotel():
+    """Lista de hóspedes (inscrições Jantar + Hotel) para enviar ao hotel do evento."""
+    if not session.get('admin_logged_in'):
+        return redirect(url_for('main.admin_login'))
+
+    from fpdf import FPDF
+    from fpdf.fonts import FontFace
+    from flask import send_file
+    import io
+
+    def txt(v):
+        # Fontes padrão do PDF usam latin-1: troca caracteres fora dele em vez de quebrar
+        return str(v or '').strip().encode('latin-1', 'replace').decode('latin-1')
+
+    def fmt_cpf(cpf):
+        d = ''.join(c for c in str(cpf or '') if c.isdigit())
+        return f"{d[:3]}.{d[3:6]}.{d[6:9]}-{d[9:]}" if len(d) == 11 else (txt(cpf) or '-')
+
+    def fmt_tel(tel):
+        d = ''.join(c for c in str(tel or '') if c.isdigit())
+        if d.startswith('55') and len(d) in (12, 13):
+            d = d[2:]
+        if len(d) == 11:
+            return f"({d[:2]}) {d[2:7]}-{d[7:]}"
+        if len(d) == 10:
+            return f"({d[:2]}) {d[2:6]}-{d[6:]}"
+        return txt(tel)
+
+    todas = [i for i in Inscricao.query.all() if 'HOTEL' in (i.tipo_inscricao or '').upper()]
+    hospedes = sorted([i for i in todas if not i.sinalizada_exclusao], key=lambda i: (i.nome_completo or '').strip().upper())
+    retiradas = len(todas) - len(hospedes)
+
+    agora = datetime.now()
+
+    class PDF(FPDF):
+        def header(self):
+            self.set_font("helvetica", "B", 16)
+            self.cell(0, 9, txt(f"Lista de Hóspedes - {EVENTO_NOME} DEFAD"), new_x="LMARGIN", new_y="NEXT", align="C")
+            self.set_font("helvetica", "", 10)
+            self.set_text_color(90, 90, 90)
+            self.cell(0, 6, txt(f"Evento: {EVENTO_DATA}  |  Modalidade: Jantar + Hotel  |  Gerado em {agora.strftime('%d/%m/%Y às %H:%M')}"),
+                      new_x="LMARGIN", new_y="NEXT", align="C")
+            self.set_text_color(0, 0, 0)
+            self.ln(3)
+
+        def footer(self):
+            self.set_y(-12)
+            self.set_font("helvetica", "I", 8)
+            self.set_text_color(120, 120, 120)
+            self.cell(0, 8, txt(f"DEFAD - {EVENTO_NOME}  |  Página {self.page_no()}/{{nb}}"), align="C")
+
+    pdf = PDF(orientation="L", format="A4")
+    pdf.set_auto_page_break(auto=True, margin=15)
+    pdf.add_page()
+
+    # Resumo
+    pdf.set_fill_color(255, 237, 213)
+    pdf.set_font("helvetica", "B", 11)
+    resumo = f"Total: {len(hospedes)} casal(is)  |  {len(hospedes)} quarto(s) de casal  |  {len(hospedes) * 2} hóspede(s)"
+    pdf.cell(0, 10, txt(resumo), border=0, align="C", fill=True, new_x="LMARGIN", new_y="NEXT")
+    pdf.ln(4)
+
+    if not hospedes:
+        pdf.set_font("helvetica", "", 11)
+        pdf.cell(0, 10, txt("Nenhuma inscrição na modalidade Jantar + Hotel."), align="C")
+    else:
+        pdf.set_font("helvetica", "", 9)
+        pdf.set_fill_color(245, 245, 245)
+        cabecalho = FontFace(emphasis="BOLD", color=(255, 255, 255), fill_color=(194, 65, 12))
+        with pdf.table(
+            col_widths=(10, 62, 34, 62, 32, 24, 43, 15),
+            text_align=("CENTER", "LEFT", "CENTER", "LEFT", "CENTER", "CENTER", "LEFT", "CENTER"),
+            headings_style=cabecalho,
+            cell_fill_color=(245, 245, 245),
+            cell_fill_mode="ROWS",
+            line_height=5,
+        ) as table:
+            table.row([txt(h) for h in ("Nº", "Hóspede 1 (Titular)", "CPF do Titular", "Hóspede 2 (Cônjuge)",
+                                          "Telefone / WhatsApp", "Data Casamento", "Congregação", "Inscr.")])
+            for n, i in enumerate(hospedes, start=1):
+                table.row([
+                    str(n),
+                    txt(i.nome_completo),
+                    fmt_cpf(i.cpf_responsavel),
+                    txt(i.nome_conjuge),
+                    fmt_tel(i.telefone),
+                    i.data_casamento.strftime('%d/%m/%Y') if i.data_casamento else '-',
+                    txt(i.local_congregacao),
+                    f"#{i.id}",
+                ])
+
+        pdf.ln(4)
+        pdf.set_font("helvetica", "I", 8)
+        pdf.set_text_color(100, 100, 100)
+        obs = "Cada inscrição corresponde a 1 casal (2 hóspedes) em 1 quarto de casal. Lista em ordem alfabética pelo titular."
+        if retiradas:
+            obs += f" Não constam {retiradas} inscrição(ões) que informaram que não vão participar."
+        pdf.multi_cell(0, 5, txt(obs))
+
+    pdf_bytes = pdf.output()
+    return send_file(io.BytesIO(bytes(pdf_bytes)), mimetype='application/pdf', as_attachment=True,
+                     download_name=f"lista_hospedes_hotel_{agora.strftime('%d-%m-%Y')}.pdf")
+
 @bp.route('/admin/excluir_inscricao/<int:id>', methods=['POST'])
 def excluir_inscricao(id):
     if not session.get('admin_logged_in'):
