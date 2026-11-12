@@ -947,6 +947,13 @@ def exportar_hotel():
             return f"({d[:2]}) {d[2:6]}-{d[6:]}"
         return txt(tel)
 
+    def rotulo_pagamento(i):
+        st = status_pagamento(i)
+        if st == 'pago':
+            return 'Pago'
+        pagas = sum(1 for p in i.parcelas if p.status_parcela == 'Pago')
+        return f"Parcial ({pagas}/{len(i.parcelas)})" if st == 'parcial' else 'Pendente'
+
     todas = [i for i in Inscricao.query.all() if 'HOTEL' in (i.tipo_inscricao or '').upper()]
     hospedes = sorted([i for i in todas if not i.sinalizada_exclusao], key=lambda i: (i.nome_completo or '').strip().upper())
     retiradas = len(todas) - len(hospedes)
@@ -979,6 +986,11 @@ def exportar_hotel():
     pdf.set_font("helvetica", "B", 11)
     resumo = f"Total: {len(hospedes)} casal(is)  |  {len(hospedes)} quarto(s) de casal  |  {len(hospedes) * 2} hóspede(s)"
     pdf.cell(0, 10, txt(resumo), border=0, align="C", fill=True, new_x="LMARGIN", new_y="NEXT")
+    cont = {k: sum(1 for i in hospedes if status_pagamento(i) == k) for k in ('pago', 'parcial', 'pendente')}
+    pdf.set_font("helvetica", "B", 10)
+    pdf.set_fill_color(243, 244, 246)
+    pdf.cell(0, 8, txt(f"Pagamento:  {cont['pago']} pago(s)  |  {cont['parcial']} parcial(is)  |  {cont['pendente']} pendente(s)"),
+             border=0, align="C", fill=True, new_x="LMARGIN", new_y="NEXT")
     pdf.ln(4)
 
     if not hospedes:
@@ -989,15 +1001,15 @@ def exportar_hotel():
         pdf.set_fill_color(245, 245, 245)
         cabecalho = FontFace(emphasis="BOLD", color=(255, 255, 255), fill_color=(194, 65, 12))
         with pdf.table(
-            col_widths=(10, 62, 34, 62, 32, 24, 43, 15),
-            text_align=("CENTER", "LEFT", "CENTER", "LEFT", "CENTER", "CENTER", "LEFT", "CENTER"),
+            col_widths=(10, 58, 32, 58, 30, 22, 36, 26, 14),
+            text_align=("CENTER", "LEFT", "CENTER", "LEFT", "CENTER", "CENTER", "LEFT", "CENTER", "CENTER"),
             headings_style=cabecalho,
             cell_fill_color=(245, 245, 245),
             cell_fill_mode="ROWS",
             line_height=5,
         ) as table:
             table.row([txt(h) for h in ("Nº", "Hóspede 1 (Titular)", "CPF do Titular", "Hóspede 2 (Cônjuge)",
-                                          "Telefone / WhatsApp", "Data Casamento", "Congregação", "Inscr.")])
+                                          "Telefone / WhatsApp", "Data Casamento", "Congregação", "Pagamento", "Inscr.")])
             for n, i in enumerate(hospedes, start=1):
                 table.row([
                     str(n),
@@ -1007,6 +1019,7 @@ def exportar_hotel():
                     fmt_tel(i.telefone),
                     i.data_casamento.strftime('%d/%m/%Y') if i.data_casamento else '-',
                     txt(i.local_congregacao),
+                    rotulo_pagamento(i),
                     f"#{i.id}",
                 ])
 
