@@ -1052,6 +1052,16 @@ def editar_inscricao(id):
     inscricao.telefone = request.form.get('telefone')
     inscricao.local_congregacao = request.form.get('local_congregacao')
     
+    # CPF do titular (o campo só é enviado quando o tipo selecionado é Jantar + Hotel)
+    if 'cpf_responsavel' in request.form:
+        cpf_digitos = ''.join(c for c in request.form.get('cpf_responsavel', '') if c.isdigit())
+        if not cpf_digitos:
+            inscricao.cpf_responsavel = None
+        elif len(cpf_digitos) == 11:
+            inscricao.cpf_responsavel = f"{cpf_digitos[:3]}.{cpf_digitos[3:6]}.{cpf_digitos[6:9]}-{cpf_digitos[9:]}"
+        else:
+            flash('CPF inválido: informe os 11 dígitos. O CPF não foi alterado; os demais dados foram salvos.', 'error')
+
     data_casamento_str = request.form.get('data_casamento')
     if data_casamento_str:
         try:

@@ -400,7 +400,7 @@
                                         </button>
                                     </form>
                                     {% endif %}
-                                    <button onclick="openEditModal({{ i.id }}, '{{ i.nome_completo }}', '{{ i.nome_conjuge }}', '{{ i.telefone }}', '{{ i.data_casamento.strftime('%Y-%m-%d') }}', '{{ i.local_congregacao }}', '{{ i.tipo_inscricao }}')" class="inline-flex items-center text-xs font-semibold text-blue-600 hover:text-blue-800 transition bg-blue-50 hover:bg-blue-100 px-2 py-1 rounded-md">
+                                    <button onclick="openEditModal({{ i.id }}, '{{ i.nome_completo }}', '{{ i.nome_conjuge }}', '{{ i.telefone }}', '{{ i.data_casamento.strftime('%Y-%m-%d') }}', '{{ i.local_congregacao }}', '{{ i.tipo_inscricao }}', '{{ i.cpf_responsavel or '' }}')" class="inline-flex items-center text-xs font-semibold text-blue-600 hover:text-blue-800 transition bg-blue-50 hover:bg-blue-100 px-2 py-1 rounded-md">
                                         Editar
                                     </button>
                                     <div id="parcelas_data_{{ i.id }}" class="hidden">
@@ -485,6 +485,11 @@
                                 <input type="hidden" id="original_tipo_inscricao">
                             </div>
 
+                            <div id="edit_cpf_container" class="hidden">
+                                <label class="block text-sm font-medium text-gray-700">CPF do Titular <span class="text-xs text-gray-500">(obrigatório para Jantar + Hotel)</span></label>
+                                <input type="text" name="cpf_responsavel" id="edit_cpf_responsavel" inputmode="numeric" maxlength="14" placeholder="000.000.000-00" oninput="mascaraCpf(this)" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-orange-500 focus:border-orange-500 sm:text-sm">
+                            </div>
+
                             <div id="edit_parcelas_individuais" class="mt-4 border-t border-gray-200 pt-4">
                                 <label class="block text-sm font-medium text-gray-700 mb-2">Editar Vencimento das Parcelas Atuais</label>
                                 <div id="edit_parcelas_list" class="space-y-2"></div>
@@ -553,7 +558,26 @@
             document.getElementById('edit_valor_parcela').innerText = "R$ " + valorParcela.toFixed(2).replace('.', ',');
         }
 
-        function openEditModal(id, nome_completo, nome_conjuge, telefone, data_casamento, local_congregacao, tipo_inscricao) {
+        function mascaraCpf(el) {
+            let d = el.value.replace(/\D/g, '').slice(0, 11);
+            if (d.length > 9) d = d.replace(/(\d{3})(\d{3})(\d{3})(\d{1,2})/, '$1.$2.$3-$4');
+            else if (d.length > 6) d = d.replace(/(\d{3})(\d{3})(\d{1,3})/, '$1.$2.$3');
+            else if (d.length > 3) d = d.replace(/(\d{3})(\d{1,3})/, '$1.$2');
+            el.value = d;
+        }
+
+        function atualizarCampoCpf() {
+            // Mostra o CPF só quando o tipo selecionado é Jantar + Hotel
+            let tipo = document.getElementById('edit_tipo_inscricao').value || '';
+            let ehHotel = tipo.toUpperCase().indexOf('HOTEL') > -1;
+            document.getElementById('edit_cpf_container').classList.toggle('hidden', !ehHotel);
+            document.getElementById('edit_cpf_responsavel').disabled = !ehHotel; // campo oculto não é enviado
+        }
+
+        function openEditModal(id, nome_completo, nome_conjuge, telefone, data_casamento, local_congregacao, tipo_inscricao, cpf_responsavel) {
+            let cpfInput = document.getElementById('edit_cpf_responsavel');
+            cpfInput.value = cpf_responsavel || '';
+            mascaraCpf(cpfInput);
             document.getElementById('editForm').action = "/admin/editar_inscricao/" + id;
             document.getElementById('edit_nome_completo').value = nome_completo;
             document.getElementById('edit_nome_conjuge').value = nome_conjuge;
@@ -590,6 +614,7 @@
             let indivContainer = document.getElementById('edit_parcelas_individuais');
             
             updateParcelaValue();
+            atualizarCampoCpf();
             
             if (current !== original) {
                 checkbox.checked = true;
