@@ -801,73 +801,122 @@ def admin_remover_sinalizacao(id):
     flash(f'Sinalização de retirada removida de {inscricao.nome_completo}.', 'success')
     return redirect(url_for('main.admin'))
 
+STATUS_EXPORT = {'todos': 'Todos', 'pago': 'Pago Total', 'parcial': 'Pago Parcial', 'pendente': 'Pendente (nenhuma parcela paga)'}
+TIPO_EXPORT = {'todos': 'Todos', 'jantar': 'Jantar', 'jantar_hotel': 'Jantar + Hotel'}
+
+
+def status_pagamento(inscricao):
+    """'pago', 'parcial' ou 'pendente', calculado pelas parcelas (mesma regra dos cards do painel)."""
+    pagas = [p for p in inscricao.parcelas if p.status_parcela == 'Pago']
+    if not pagas:
+        return 'pendente'
+    return 'pago' if len(pagas) == len(inscricao.parcelas) else 'parcial'
+
+
+def tipo_export(inscricao):
+    return 'jantar_hotel' if 'HOTEL' in (inscricao.tipo_inscricao or '').upper() else 'jantar'
+
+
 @bp.route('/admin/exportar_pdf')
 def exportar_pdf():
     if not session.get('admin_logged_in'):
         return redirect(url_for('main.admin_login'))
-        
-    try:
-        from fpdf import FPDF
-    except ImportError:
-        flash("Biblioteca fpdf2 não está instalada.", "error")
-        return redirect(url_for('main.admin'))
 
-    inscricoes = Inscricao.query.order_by(Inscricao.data_inscricao.desc()).all()
+    from fpdf import FPDF
+    from fpdf.fonts import FontFace
+    from flask import send_file
+    import io
+
+    status = request.args.get('status', 'todos')
+    tipo = request.args.get('tipo', 'todos')
+    if status not in STATUS_EXPORT:
+        status = 'todos'
+    if tipo not in TIPO_EXPORT:
+        tipo = 'todos'
+
+    def txt(v):
+        return str(v or '').strip().encode('latin-1', 'replace').decode('latin-1')
+
+    def moeda(v):
+        return f"R$ {v:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
+
+    inscricoes = [
+        i for i in Inscricao.query.all()
+        if (status == 'todos' or status_pagamento(i) == status)
+        and (tipo == 'todos' or tipo_export(i) == tipo)
+    ]
+    inscricoes.sort(key=lambda i: (i.nome_completo or '').strip().upper())
+
+    rotulo_status = {'pago': 'Pago Total', 'parcial': 'Pago Parcial', 'pendente': 'Pendente'}
+    total_pago = sum(p.valor_parcela for i in inscricoes for p in i.parcelas if p.status_parcela == 'Pago')
+    total_aberto = sum(p.valor_parcela for i in inscricoes for p in i.parcelas if p.status_parcela != 'Pago')
+    agora = datetime.now()
+    filtro = f"Status: {STATUS_EXPORT[status]}  |  Tipo: {TIPO_EXPORT[tipo]}  |  Gerado em {agora.strftime('%d/%m/%Y às %H:%M')}"
 
     class PDF(FPDF):
         def header(self):
             self.set_font("helvetica", "B", 15)
-            self.cell(0, 10, "Relatório de Inscritos - Jantar de Casais DEFAD", new_x="LMARGIN", new_y="NEXT", align="C")
-            self.ln(5)
+            self.cell(0, 9, txt(f"Relatório de Inscritos - {EVENTO_NOME} DEFAD"), new_x="LMARGIN", new_y="NEXT", align="C")
+            self.set_font("helvetica", "", 10)
+            self.set_text_color(90, 90, 90)
+            self.cell(0, 6, txt(filtro), new_x="LMARGIN", new_y="NEXT", align="C")
+            self.set_text_color(0, 0, 0)
+            self.ln(3)
 
         def footer(self):
-            self.set_y(-15)
+            self.set_y(-12)
             self.set_font("helvetica", "I", 8)
-            self.cell(0, 10, f"Página {self.page_no()}/{{nb}}", align="C")
+            self.set_text_color(120, 120, 120)
+            self.cell(0, 8, f"Página {self.page_no()}/{{nb}}", align="C")
 
     pdf = PDF(orientation="L", format="A4")
+    pdf.set_auto_page_break(auto=True, margin=15)
     pdf.add_page()
-    pdf.set_font("helvetica", "B", 10)
-    
-    # Header da tabela
-    col_widths = [15, 60, 60, 35, 40, 25, 30] # total 265 (~270 A4 Landscape)
-    headers = ["ID", "Casal", "Congregação", "WhatsApp", "Tipo", "Data Cas.", "Status"]
-    for i, h in enumerate(headers):
-        pdf.cell(col_widths[i], 10, h, border=1, align="C")
-    pdf.ln()
 
-    # Linhas
-    pdf.set_font("helvetica", "", 9)
-    fill = False
-    pdf.set_fill_color(240, 240, 240)
-    
-    for ins in inscricoes:
-        casal = f"{ins.nome_completo} & {ins.nome_conjuge}"
-        # Cortar textos longos se necessário
-        if len(casal) > 40: casal = casal[:37] + "..."
-        congreg = ins.local_congregacao
-        if len(congreg) > 35: congreg = congreg[:32] + "..."
-        
-        pdf.cell(col_widths[0], 8, str(ins.id), border=1, align="C", fill=fill)
-        pdf.cell(col_widths[1], 8, casal, border=1, fill=fill)
-        pdf.cell(col_widths[2], 8, congreg, border=1, fill=fill)
-        pdf.cell(col_widths[3], 8, ins.telefone, border=1, align="C", fill=fill)
-        pdf.cell(col_widths[4], 8, ins.tipo_inscricao[:20], border=1, align="C", fill=fill)
-        pdf.cell(col_widths[5], 8, ins.data_casamento.strftime("%d/%m/%Y"), border=1, align="C", fill=fill)
-        pdf.cell(col_widths[6], 8, ins.status_geral, border=1, align="C", fill=fill)
-        pdf.ln()
-        fill = not fill
+    pdf.set_fill_color(255, 237, 213)
+    pdf.set_font("helvetica", "B", 11)
+    resumo = f"{len(inscricoes)} inscrição(ões)  |  Pago: {moeda(total_pago)}  |  Em aberto: {moeda(total_aberto)}"
+    pdf.cell(0, 10, txt(resumo), align="C", fill=True, new_x="LMARGIN", new_y="NEXT")
+    pdf.ln(4)
 
-    from flask import send_file
-    import io
-    pdf_bytes = pdf.output(dest='S')
-    
-    return send_file(
-        io.BytesIO(pdf_bytes),
-        mimetype='application/pdf',
-        as_attachment=True,
-        download_name='relatorio_inscritos.pdf'
-    )
+    if not inscricoes:
+        pdf.set_font("helvetica", "", 11)
+        pdf.cell(0, 10, txt("Nenhuma inscrição encontrada com esses filtros."), align="C")
+    else:
+        pdf.set_font("helvetica", "", 8)
+        pdf.set_fill_color(245, 245, 245)
+        cabecalho = FontFace(emphasis="BOLD", color=(255, 255, 255), fill_color=(31, 41, 55))
+        with pdf.table(
+            col_widths=(12, 72, 40, 30, 24, 20, 22, 22, 22, 13),
+            text_align=("CENTER", "LEFT", "LEFT", "CENTER", "CENTER", "CENTER", "CENTER", "RIGHT", "RIGHT", "CENTER"),
+            headings_style=cabecalho,
+            cell_fill_mode="ROWS",
+            line_height=5,
+        ) as table:
+            table.row([txt(h) for h in ("Inscr.", "Casal", "Congregação", "WhatsApp", "Tipo", "Data Cas.",
+                                          "Status", "Pago", "Em aberto", "Parc.")])
+            for i in inscricoes:
+                pagas = [p for p in i.parcelas if p.status_parcela == 'Pago']
+                table.row([
+                    f"#{i.id}",
+                    txt(f"{i.nome_completo} & {i.nome_conjuge}"),
+                    txt(i.local_congregacao),
+                    txt(i.telefone),
+                    txt(TIPO_EXPORT[tipo_export(i)]),
+                    i.data_casamento.strftime('%d/%m/%Y') if i.data_casamento else '-',
+                    rotulo_status[status_pagamento(i)],
+                    moeda(sum(p.valor_parcela for p in pagas)),
+                    moeda(sum(p.valor_parcela for p in i.parcelas if p.status_parcela != 'Pago')),
+                    f"{len(pagas)}/{len(i.parcelas)}",
+                ])
+
+    nome = 'relatorio_inscritos'
+    if tipo != 'todos':
+        nome += f'_{tipo}'
+    if status != 'todos':
+        nome += f'_{status}'
+    return send_file(io.BytesIO(bytes(pdf.output())), mimetype='application/pdf', as_attachment=True,
+                     download_name=f"{nome}_{agora.strftime('%d-%m-%Y')}.pdf")
 
 @bp.route('/admin/exportar_hotel')
 def exportar_hotel():
