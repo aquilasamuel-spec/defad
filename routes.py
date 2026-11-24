@@ -372,6 +372,7 @@ def admin():
                            qtd_pago_total=sum(1 for i in inscricoes if i.parcelas and all(p.status_parcela == 'Pago' for p in i.parcelas)),
                            qtd_pago_parcial=sum(1 for i in inscricoes if i.pagou_alguma_parcela and not all(p.status_parcela == 'Pago' for p in i.parcelas)),
                            total_para_confirmar=len(inscricoes_para_confirmar()),
+                           congregacoes=lista_congregacoes(inscricoes),
                            total_sinalizadas=sum(1 for i in inscricoes if i.sinalizada_exclusao),
                            evento_nome=EVENTO_NOME,
                            evento_data=EVENTO_DATA,
@@ -803,6 +804,15 @@ def admin_remover_sinalizacao(id):
 
 STATUS_EXPORT = {'todos': 'Todos', 'pago': 'Pago Total', 'parcial': 'Pago Parcial', 'pendente': 'Pendente (nenhuma parcela paga)'}
 TIPO_EXPORT = {'todos': 'Todos', 'jantar': 'Jantar', 'jantar_hotel': 'Jantar + Hotel'}
+ORDEM_CONGREGACOES = ['Templo Central', 'Área 1', 'Área 2', 'Área 3', 'Área 4', 'Área 5', 'Área 6', 'Área 7',
+                      'Campo', 'Outra Denominação', 'Não Evangélico']
+
+
+def lista_congregacoes(inscricoes):
+    """Congregações/áreas existentes nas inscrições, na ordem do formulário (outras no fim, em ordem alfabética)."""
+    existentes = {(i.local_congregacao or '').strip() for i in inscricoes if (i.local_congregacao or '').strip()}
+    ordem = [c for c in ORDEM_CONGREGACOES if c in existentes]
+    return ordem + sorted(existentes - set(ordem), key=str.upper)
 
 
 def status_pagamento(inscricao):
@@ -829,6 +839,7 @@ def exportar_pdf():
 
     status = request.args.get('status', 'todos')
     tipo = request.args.get('tipo', 'todos')
+    congregacao = (request.args.get('congregacao') or 'todos').strip()
     if status not in STATUS_EXPORT:
         status = 'todos'
     if tipo not in TIPO_EXPORT:
@@ -844,6 +855,7 @@ def exportar_pdf():
         i for i in Inscricao.query.all()
         if (status == 'todos' or status_pagamento(i) == status)
         and (tipo == 'todos' or tipo_export(i) == tipo)
+        and (congregacao == 'todos' or (i.local_congregacao or '').strip() == congregacao)
     ]
     inscricoes.sort(key=lambda i: (i.nome_completo or '').strip().upper())
 
@@ -851,7 +863,7 @@ def exportar_pdf():
     total_pago = sum(p.valor_parcela for i in inscricoes for p in i.parcelas if p.status_parcela == 'Pago')
     total_aberto = sum(p.valor_parcela for i in inscricoes for p in i.parcelas if p.status_parcela != 'Pago')
     agora = datetime.now()
-    filtro = f"Status: {STATUS_EXPORT[status]}  |  Tipo: {TIPO_EXPORT[tipo]}  |  Gerado em {agora.strftime('%d/%m/%Y às %H:%M')}"
+    filtro = f"Status: {STATUS_EXPORT[status]}  |  Tipo: {TIPO_EXPORT[tipo]}  |  Congregação/Área: {'Todas' if congregacao == 'todos' else congregacao}  |  Gerado em {agora.strftime('%d/%m/%Y às %H:%M')}"
 
     class PDF(FPDF):
         def header(self):
@@ -915,6 +927,10 @@ def exportar_pdf():
         nome += f'_{tipo}'
     if status != 'todos':
         nome += f'_{status}'
+    if congregacao != 'todos':
+        import unicodedata, re as _re
+        slug = unicodedata.normalize('NFKD', congregacao).encode('ascii', 'ignore').decode().lower()
+        nome += '_' + _re.sub(r'[^a-z0-9]+', '_', slug).strip('_')
     return send_file(io.BytesIO(bytes(pdf.output())), mimetype='application/pdf', as_attachment=True,
                      download_name=f"{nome}_{agora.strftime('%d-%m-%Y')}.pdf")
 

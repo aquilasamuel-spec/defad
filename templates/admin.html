@@ -270,11 +270,17 @@
                     <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v11m0-4h18m0 4v-8a3 3 0 00-3-3h-8v7M7 11a2 2 0 100-4 2 2 0 000 4z"></path></svg>
                     Lista para o Hotel (PDF)
                 </a>
-                <form action="{{ url_for('main.exportar_pdf') }}" method="GET" class="inline-flex items-center gap-2 bg-gray-100 border border-gray-200 rounded-lg p-1">
+                <form action="{{ url_for('main.exportar_pdf') }}" method="GET" class="inline-flex flex-wrap items-center gap-2 bg-gray-100 border border-gray-200 rounded-lg p-1">
                     <select name="tipo" title="Tipo de inscrição" class="px-2 py-1.5 border border-gray-300 rounded-md text-sm bg-white focus:outline-none focus:border-orange-500">
                         <option value="todos">Todos os tipos</option>
                         <option value="jantar">Jantar</option>
                         <option value="jantar_hotel">Jantar + Hotel</option>
+                    </select>
+                    <select name="congregacao" title="Congregação / Área" class="px-2 py-1.5 border border-gray-300 rounded-md text-sm bg-white focus:outline-none focus:border-orange-500">
+                        <option value="todos">Todas as congregações</option>
+                        {% for c in congregacoes %}
+                        <option value="{{ c }}">{{ c }}</option>
+                        {% endfor %}
                     </select>
                     <select name="status" title="Status de pagamento" class="px-2 py-1.5 border border-gray-300 rounded-md text-sm bg-white focus:outline-none focus:border-orange-500">
                         <option value="todos">Todos os status</option>
