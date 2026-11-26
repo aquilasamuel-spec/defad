@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Informações do Jantar - DEFAD</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Outfit', sans-serif; background-color: #f8fafc; }
+        .balao { background: #ffffff; border-radius: 0 12px 12px 12px; white-space: pre-wrap; }
+    </style>
+</head>
+<body class="text-gray-800">
+    <nav class="bg-gradient-to-r from-orange-500 to-red-600 text-white shadow-md">
+        <div class="max-w-6xl mx-auto px-4 flex items-center justify-between h-16">
+            <span class="font-bold text-xl tracking-wider">DEFAD ADMIN</span>
+            <a href="{{ url_for('main.admin') }}" class="text-white/90 hover:text-white text-sm font-medium">← Voltar ao painel</a>
+        </div>
+    </nav>
+
+    <div class="max-w-6xl mx-auto px-4 py-8">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+          {% for category, message in messages %}
+            <div class="mb-6 p-4 rounded-lg {% if category == 'success' %}bg-green-100 text-green-800 border border-green-200{% else %}bg-red-100 text-red-800 border border-red-200{% endif %}">{{ message }}</div>
+          {% endfor %}
+        {% endwith %}
+
+        <h1 class="text-2xl font-bold text-gray-900 mb-1">Enviar Informações do Jantar</h1>
+        <p class="text-sm text-gray-500 mb-6">Template da Meta: <code class="bg-gray-100 px-1 rounded">{{ template_nome }}</code> · Confira a prévia e a lista antes de confirmar.</p>
+
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            <!-- PRÉVIA -->
+            <div>
+                <h2 class="text-lg font-bold mb-3">Prévia da mensagem</h2>
+                <div class="rounded-2xl p-4" style="background:#e5ddd5">
+                    <div class="balao shadow-sm p-4 text-sm leading-relaxed text-gray-900">{{ texto_exemplo }}</div>
+                </div>
+                <p class="text-xs text-gray-500 mt-2">O nome do casal ({{ '{{1}}' }}) muda para cada inscrito; a prévia usa o primeiro da lista. O texto exibido é uma cópia do template aprovado — o que chega no WhatsApp é o texto cadastrado na Meta.</p>
+            </div>
+
+            <!-- DESTINATÁRIOS -->
+            <div>
+                <div class="flex flex-wrap items-center justify-between gap-3 mb-3">
+                    <h2 class="text-lg font-bold">Vão receber: {{ alvos|length }} casal(is)</h2>
+                    <form method="GET" class="flex items-center gap-2 text-sm">
+                        <label class="flex items-center gap-2 cursor-pointer">
+                            <input type="checkbox" name="incluir_parcial" value="1" {% if incluir_parcial %}checked{% endif %} onchange="this.form.submit()" class="h-4 w-4 text-orange-600 rounded">
+                            Incluir quem pagou parcial
+                        </label>
+                    </form>
+                </div>
+                <p class="text-xs text-gray-500 mb-3">
+                    Critério: {% if incluir_parcial %}pagos (total) e parciais{% else %}somente quem pagou todas as parcelas{% endif %}.
+                    Ficam de fora quem respondeu "Não" e quem já recebeu esta mensagem.
+                </p>
+
+                <div class="bg-white border border-gray-200 rounded-xl max-h-[420px] overflow-y-auto">
+                    <table class="min-w-full text-sm">
+                        <thead class="bg-gray-50 sticky top-0">
+                            <tr>
+                                <th class="px-3 py-2 text-left font-semibold text-gray-600">Inscr.</th>
+                                <th class="px-3 py-2 text-left font-semibold text-gray-600">Nome na mensagem</th>
+                                <th class="px-3 py-2 text-left font-semibold text-gray-600">WhatsApp</th>
+                                <th class="px-3 py-2 text-left font-semibold text-gray-600">Pagamento</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-100">
+                            {% for i in alvos %}
+                            <tr>
+                                <td class="px-3 py-2 text-gray-500">#{{ i.id }}</td>
+                                <td class="px-3 py-2 font-semibold">{{ nome_casal(i) }}</td>
+                                <td class="px-3 py-2 text-gray-600">{{ i.telefone }}</td>
+                                <td class="px-3 py-2">{% if status_pagamento(i) == 'pago' %}<span class="text-green-700">Pago</span>{% else %}<span class="text-yellow-700">Parcial</span>{% endif %}</td>
+                            </tr>
+                            {% else %}
+                            <tr><td colspan="4" class="px-3 py-6 text-center text-gray-500">Ninguém pendente de receber.</td></tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+
+                {% if alvos %}
+                <form method="POST" action="{{ url_for('main.admin_info_logistica_enviar') }}" class="mt-4"
+                      onsubmit="return confirm('Confirmar o envio das informações do jantar para {{ alvos|length }} casal(is)?');">
+                    <input type="hidden" name="incluir_parcial" value="{{ '1' if incluir_parcial else '0' }}">
+                    <button type="submit" class="w-full bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white font-bold py-3 px-6 rounded-lg shadow-md transition">
+                        Confirmar envio para {{ alvos|length }} casal(is)
+                    </button>
+                </form>
+                {% endif %}
+            </div>
+        </div>
+
+        {% if ja_enviados %}
+        <div class="mt-10">
+            <h2 class="text-lg font-bold mb-3">Já receberam: {{ ja_enviados|length }}</h2>
+            <div class="bg-white border border-gray-200 rounded-xl max-h-[300px] overflow-y-auto">
+                <table class="min-w-full text-sm">
+                    <tbody class="divide-y divide-gray-100">
+                        {% for i in ja_enviados %}
+                        <tr>
+                            <td class="px-3 py-2 text-gray-500">#{{ i.id }}</td>
+                            <td class="px-3 py-2">{{ nome_casal(i) }}</td>
+                            <td class="px-3 py-2 text-gray-600">{{ i.telefone }}</td>
+                            <td class="px-3 py-2 text-gray-500">{{ i.info_logistica_enviada_em.strftime('%d/%m %H:%M') }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</body>
+</html>

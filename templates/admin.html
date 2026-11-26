@@ -135,6 +135,10 @@
 
         <!-- BOTÕES DE DISPAROS -->
         <div class="mb-8 flex flex-wrap justify-end gap-3">
+            <a href="{{ url_for('main.admin_info_logistica') }}" class="bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white font-bold py-3 px-6 rounded-lg shadow-md transition transform hover:-translate-y-1 flex items-center">
+                <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                Enviar Informações do Jantar
+            </a>
             {% if total_sinalizadas %}
             <button type="button" onclick="filtrarSinalizadas()" title="Clique para listar só essas inscrições" class="flex items-center px-4 py-3 rounded-lg bg-red-50 hover:bg-red-100 border border-red-200 text-red-800 text-sm font-semibold transition cursor-pointer">
                 ⚠️ {{ total_sinalizadas }} inscrição(ões) sinalizada(s) para retirada (responderam "Não") — ver lista

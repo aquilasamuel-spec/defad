@@ -33,6 +33,8 @@ class Inscricao(db.Model):
     confirmacao_respondida_em = db.Column(db.DateTime, nullable=True)
     # True quando o inscrito respondeu "Não": a inscrição deve ser retirada/excluída pelo admin
     sinalizada_exclusao = db.Column(db.Boolean, default=False, nullable=False)
+    # Quando o template de logística do jantar (info_logistica_jantar_casais) foi enviado
+    info_logistica_enviada_em = db.Column(db.DateTime, nullable=True)
 
     @property
     def pagou_alguma_parcela(self):

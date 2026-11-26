@@ -827,6 +827,124 @@ def tipo_export(inscricao):
     return 'jantar_hotel' if 'HOTEL' in (inscricao.tipo_inscricao or '').upper() else 'jantar'
 
 
+# ---------------------------------------------------------------------------
+# INFORMAÇÕES DE LOGÍSTICA DO JANTAR (template info_logistica_jantar_casais)
+# ---------------------------------------------------------------------------
+TEMPLATE_LOGISTICA = os.environ.get('TEMPLATE_LOGISTICA', 'info_logistica_jantar_casais')
+
+# Cópia do texto aprovado na Meta, só para a prévia no painel ({{1}} = nome do casal).
+TEXTO_LOGISTICA = """*Informações: Jantar de Casais*
+
+Olá, {{1}}. Seguem as informações referentes à sua inscrição no Jantar de Casais:
+
+*Data:* 28/11 (sábado)
+*Local:* Garden Hotel – Rua Eng. José Bezerra, 400, Mirante, Campina Grande – PB
+
+*Estacionamento:*
+Disponível a partir das 17h30. Valor: R$ 10,00 (pagamento na entrada, preferencialmente em espécie para facilitar o fluxo).
+
+*Programação:*
+- 18h às 18h30: Recepção, identificação dos casais, café de boas-vindas e fotos
+- 18h30: Entrada no auditório
+- 18h45: Início da programação (louvor, palestra e renovação de votos)
+- 20h30: Jantar
+- 22h30: Encerramento
+
+*Orientações:*
+Recomendamos chegar com antecedência, considerando a abertura do estacionamento e o horário de início das atividades."""
+
+
+def formatar_whatsapp(texto):
+    """Mostra *negrito* do WhatsApp como negrito na prévia (texto escapado antes)."""
+    import re
+    from markupsafe import Markup, escape
+    return Markup(re.sub(r'\*([^*\n]+)\*', r'<b>\1</b>', str(escape(texto))))
+
+
+def primeiro_nome(nome):
+    partes = (nome or '').strip().split()
+    if not partes:
+        return ''
+    n = partes[0]
+    return n.capitalize() if n.isupper() or n.islower() else n
+
+
+def nome_casal(inscricao):
+    """Ex.: 'Áquila e Sanny' (primeiro nome do titular e do cônjuge)."""
+    nomes = [n for n in (primeiro_nome(inscricao.nome_completo), primeiro_nome(inscricao.nome_conjuge)) if n]
+    return ' e '.join(nomes)
+
+
+def destinatarios_logistica(incluir_parcial=False):
+    """Inscritos pagos (e, se pedido, parciais), sem os que disseram que não vão e sem quem já recebeu."""
+    aceitos = ('pago', 'parcial') if incluir_parcial else ('pago',)
+    alvos = [
+        i for i in Inscricao.query.all()
+        if status_pagamento(i) in aceitos and not i.sinalizada_exclusao and not i.info_logistica_enviada_em
+    ]
+    return sorted(alvos, key=lambda i: (i.nome_completo or '').strip().upper())
+
+
+def logica_envio_logistica(ids):
+    import time
+    from whatsapp import send_template
+    enviados, falhas = 0, []
+    for inscricao_id in ids:
+        i = db.session.get(Inscricao, inscricao_id)
+        if not i or i.info_logistica_enviada_em:
+            continue  # evita mandar duas vezes para o mesmo casal
+        components = [{"type": "body", "parameters": [{"type": "text", "text": nome_casal(i)}]}]
+        if send_template(i.telefone, TEMPLATE_LOGISTICA, components=components):
+            i.info_logistica_enviada_em = datetime.now()
+            db.session.commit()
+            enviados += 1
+        else:
+            falhas.append(f"#{i.id} {i.nome_completo}")
+        time.sleep(0.3)
+    print(f"Informações do jantar: {enviados} enviada(s), {len(falhas)} falha(s). {', '.join(falhas)}")
+
+
+@bp.route('/admin/info_logistica')
+def admin_info_logistica():
+    if not session.get('admin_logged_in'):
+        return redirect(url_for('main.admin_login'))
+    incluir_parcial = request.args.get('incluir_parcial') == '1'
+    alvos = destinatarios_logistica(incluir_parcial)
+    ja_enviados = sorted([i for i in Inscricao.query.all() if i.info_logistica_enviada_em],
+                         key=lambda i: i.info_logistica_enviada_em, reverse=True)
+    exemplo = nome_casal(alvos[0]) if alvos else 'Áquila e Sanny'
+    return render_template('info_logistica.html',
+                           alvos=alvos,
+                           ja_enviados=ja_enviados,
+                           incluir_parcial=incluir_parcial,
+                           nome_casal=nome_casal,
+                           status_pagamento=status_pagamento,
+                           texto_exemplo=formatar_whatsapp(TEXTO_LOGISTICA.replace('{{1}}', exemplo)),
+                           template_nome=TEMPLATE_LOGISTICA)
+
+
+@bp.route('/admin/info_logistica/enviar', methods=['POST'])
+def admin_info_logistica_enviar():
+    if not session.get('admin_logged_in'):
+        return redirect(url_for('main.admin_login'))
+    incluir_parcial = request.form.get('incluir_parcial') == '1'
+    ids = [i.id for i in destinatarios_logistica(incluir_parcial)]
+    if not ids:
+        flash('Nenhum inscrito para receber as informações do jantar.', 'error')
+        return redirect(url_for('main.admin_info_logistica'))
+
+    from threading import Thread
+    app_obj = current_app._get_current_object()
+
+    def run_in_background(app):
+        with app.app_context():
+            logica_envio_logistica(ids)
+
+    Thread(target=run_in_background, args=(app_obj,)).start()
+    flash(f'Enviando as informações do jantar para {len(ids)} casal(is). Atualize esta página em 1 minuto para ver o andamento.', 'success')
+    return redirect(url_for('main.admin_info_logistica', incluir_parcial='1' if incluir_parcial else None))
+
+
 @bp.route('/admin/exportar_pdf')
 def exportar_pdf():
     if not session.get('admin_logged_in'):

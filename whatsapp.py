@@ -26,6 +26,7 @@ DESCRICAO_TEMPLATES = {
     'parcelas_pagas': 'Confirmação de pagamento',
     'confirmacao_presenca': 'Pergunta de confirmação de presença (Sim/Não)',
     'status_inscricao_jantar': 'Pergunta de confirmação da inscrição (Sim/Não)',
+    'info_logistica_jantar_casais': 'Informações do Jantar (data, local, estacionamento e programação)',
 }
 ROTULOS_PARAMETROS = {
     'nome_inscrito': 'Inscrito',
@@ -36,6 +37,7 @@ ROTULOS_PARAMETROS = {
     'lista_parcelas': 'Parcelas',
     'data_evento': 'Data do evento',
     'numero_inscricao': 'Inscrição nº',
+    'param1': 'Casal',
 }
 PARAMETROS_IGNORADOS = {'nome_evento', 'link_whatsapp'}
 
