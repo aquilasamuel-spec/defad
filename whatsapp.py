@@ -27,6 +27,7 @@ DESCRICAO_TEMPLATES = {
     'confirmacao_presenca': 'Pergunta de confirmação de presença (Sim/Não)',
     'status_inscricao_jantar': 'Pergunta de confirmação da inscrição (Sim/Não)',
     'info_logistica_jantar_casais': 'Informações do Jantar (data, local, estacionamento e programação)',
+    'info_hospedagem_hotel_evento': 'Informações de Hospedagem (políticas e regulamento do hotel)',
 }
 ROTULOS_PARAMETROS = {
     'nome_inscrito': 'Inscrito',

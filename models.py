@@ -35,6 +35,8 @@ class Inscricao(db.Model):
     sinalizada_exclusao = db.Column(db.Boolean, default=False, nullable=False)
     # Quando o template de logística do jantar (info_logistica_jantar_casais) foi enviado
     info_logistica_enviada_em = db.Column(db.DateTime, nullable=True)
+    # Quando o template de hospedagem (info_hospedagem_hotel_evento) foi enviado
+    info_hospedagem_enviada_em = db.Column(db.DateTime, nullable=True)
     # Check-in na chegada ao evento (None = ainda não chegou)
     checkin_em = db.Column(db.DateTime, nullable=True)
 

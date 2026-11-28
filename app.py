@@ -160,6 +160,7 @@ def create_app():
             "ALTER TABLE inscricao ADD COLUMN sinalizada_exclusao BOOLEAN NOT NULL DEFAULT 0;",
             "ALTER TABLE inscricao ADD COLUMN info_logistica_enviada_em DATETIME;",
             "ALTER TABLE inscricao ADD COLUMN checkin_em DATETIME;",
+            "ALTER TABLE inscricao ADD COLUMN info_hospedagem_enviada_em DATETIME;",
         ):
             try:
                 db.session.execute(db.text(ddl))

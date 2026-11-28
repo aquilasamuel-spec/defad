@@ -149,7 +149,11 @@
 
         <!-- BOTÕES DE DISPAROS -->
         <div class="mb-8 flex flex-wrap justify-end gap-3">
-            <a href="{{ url_for('main.admin_info_logistica') }}" class="bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white font-bold py-3 px-6 rounded-lg shadow-md transition transform hover:-translate-y-1 flex items-center">
+            <a href="{{ url_for('main.admin_disparo', chave='hospedagem') }}" class="bg-gradient-to-r from-orange-500 to-amber-600 hover:from-orange-600 hover:to-amber-700 text-white font-bold py-3 px-6 rounded-lg shadow-md transition transform hover:-translate-y-1 flex items-center">
+                <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v11m0-4h18m0 4v-8a3 3 0 00-3-3h-8v7M7 11a2 2 0 100-4 2 2 0 000 4z"></path></svg>
+                Enviar Informações de Hospedagem
+            </a>
+            <a href="{{ url_for('main.admin_disparo', chave='logistica') }}" class="bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white font-bold py-3 px-6 rounded-lg shadow-md transition transform hover:-translate-y-1 flex items-center">
                 <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
                 Enviar Informações do Jantar
             </a>

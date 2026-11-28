@@ -877,74 +877,145 @@ def nome_casal(inscricao):
     return ' e '.join(nomes)
 
 
-def destinatarios_logistica(incluir_parcial=False):
-    """Inscritos pagos (e, se pedido, parciais), sem os que disseram que não vão e sem quem já recebeu."""
-    aceitos = ('pago', 'parcial') if incluir_parcial else ('pago',)
+TEXTO_HOSPEDAGEM = """*Informações de Hospedagem*
+
+Olá, {{1}}. Seguem as políticas e o regulamento do hotel referentes à sua reserva de hospedagem:
+
+*Horários e Recepção:*
+- Check-in: a partir das 15h | Check-out: até as 12h
+- Documentação: obrigatório documento original com foto de todos os hóspedes.
+- Menores de 18 anos: apenas com pais ou responsável legal (obrigatório RG ou Certidão de Nascimento).
+- Estacionamento: R$ 10,00 por período de 24h.
+
+*Convivência e Estrutura:*
+- Visitantes: acesso de não-hóspedes aos quartos e lazer por R$ 70,00/pessoa (valor sujeito a alteração)
+(...)
+- Lavanderia: 08h às 16h.
+- Adicionais: secadores e redes conforme disponibilidade (não há ferro de passar).
+- Enxoval: consulte valores para peças extras."""
+
+# Cada disparo: template da Meta, coluna que guarda quando foi enviado, quem recebe e texto da prévia.
+CAMPANHAS = {
+    'logistica': {
+        'titulo': 'Informações do Jantar',
+        'template': TEMPLATE_LOGISTICA,
+        'campo': 'info_logistica_enviada_em',
+        'somente_hotel': False,
+        'criterio_padrao': 'pago',
+        'texto': TEXTO_LOGISTICA,
+        'texto_parcial': False,
+    },
+    'hospedagem': {
+        'titulo': 'Informações de Hospedagem (Hotel)',
+        'template': os.environ.get('TEMPLATE_HOSPEDAGEM', 'info_hospedagem_hotel_evento'),
+        'campo': 'info_hospedagem_enviada_em',
+        'somente_hotel': True,
+        'criterio_padrao': 'todos',
+        'texto': TEXTO_HOSPEDAGEM,
+        'texto_parcial': True,  # o print do template não mostrava o texto inteiro
+    },
+}
+CRITERIOS = {
+    'pago': ('Somente quem pagou tudo', ('pago',)),
+    'pago_parcial': ('Pagos e parciais', ('pago', 'parcial')),
+    'todos': ('Todos (inclusive quem não pagou)', ('pago', 'parcial', 'pendente')),
+}
+
+
+def destinatarios_campanha(chave, criterio):
+    camp = CAMPANHAS[chave]
+    aceitos = CRITERIOS[criterio][1]
     alvos = [
         i for i in Inscricao.query.all()
-        if status_pagamento(i) in aceitos and not i.sinalizada_exclusao and not i.info_logistica_enviada_em
+        if not i.sinalizada_exclusao
+        and not getattr(i, camp['campo'])
+        and status_pagamento(i) in aceitos
+        and (not camp['somente_hotel'] or tipo_export(i) == 'jantar_hotel')
     ]
     return sorted(alvos, key=lambda i: (i.nome_completo or '').strip().upper())
 
 
-def logica_envio_logistica(ids):
+def destinatarios_logistica(incluir_parcial=False):
+    return destinatarios_campanha('logistica', 'pago_parcial' if incluir_parcial else 'pago')
+
+
+def logica_envio_campanha(chave, ids):
     import time
     from whatsapp import send_template
+    camp = CAMPANHAS[chave]
     enviados, falhas = 0, []
     for inscricao_id in ids:
         i = db.session.get(Inscricao, inscricao_id)
-        if not i or i.info_logistica_enviada_em:
+        if not i or getattr(i, camp['campo']):
             continue  # evita mandar duas vezes para o mesmo casal
         components = [{"type": "body", "parameters": [{"type": "text", "text": nome_casal(i)}]}]
-        if send_template(i.telefone, TEMPLATE_LOGISTICA, components=components):
-            i.info_logistica_enviada_em = datetime.now()
+        if send_template(i.telefone, camp['template'], components=components):
+            setattr(i, camp['campo'], datetime.now())
             db.session.commit()
             enviados += 1
         else:
             falhas.append(f"#{i.id} {i.nome_completo}")
         time.sleep(0.3)
-    print(f"Informações do jantar: {enviados} enviada(s), {len(falhas)} falha(s). {', '.join(falhas)}")
+    print(f"{camp['titulo']}: {enviados} enviada(s), {len(falhas)} falha(s). {', '.join(falhas)}")
 
 
-@bp.route('/admin/info_logistica')
-def admin_info_logistica():
+def logica_envio_logistica(ids):
+    logica_envio_campanha('logistica', ids)
+
+
+@bp.route('/admin/disparo/<chave>')
+def admin_disparo(chave):
     if not session.get('admin_logged_in'):
         return redirect(url_for('main.admin_login'))
-    incluir_parcial = request.args.get('incluir_parcial') == '1'
-    alvos = destinatarios_logistica(incluir_parcial)
-    ja_enviados = sorted([i for i in Inscricao.query.all() if i.info_logistica_enviada_em],
-                         key=lambda i: i.info_logistica_enviada_em, reverse=True)
-    exemplo = nome_casal(alvos[0]) if alvos else 'Áquila e Sanny'
+    if chave not in CAMPANHAS:
+        return redirect(url_for('main.admin'))
+    camp = CAMPANHAS[chave]
+    criterio = request.args.get('criterio') or camp['criterio_padrao']
+    if criterio not in CRITERIOS:
+        criterio = camp['criterio_padrao']
+    alvos = destinatarios_campanha(chave, criterio)
+    ja_enviados = sorted([i for i in Inscricao.query.all() if getattr(i, camp['campo'])],
+                         key=lambda i: getattr(i, camp['campo']), reverse=True)
+    exemplo = nome_casal(alvos[0]) if alvos else 'João e Maria'
     return render_template('info_logistica.html',
-                           alvos=alvos,
-                           ja_enviados=ja_enviados,
-                           incluir_parcial=incluir_parcial,
-                           nome_casal=nome_casal,
-                           status_pagamento=status_pagamento,
-                           texto_exemplo=formatar_whatsapp(TEXTO_LOGISTICA.replace('{{1}}', exemplo)),
-                           template_nome=TEMPLATE_LOGISTICA)
+                           chave=chave, camp=camp, criterio=criterio, criterios=CRITERIOS,
+                           alvos=alvos, ja_enviados=ja_enviados,
+                           nome_casal=nome_casal, status_pagamento=status_pagamento,
+                           data_envio=lambda i: getattr(i, camp['campo']),
+                           texto_exemplo=formatar_whatsapp(camp['texto'].replace('{{1}}', exemplo)),
+                           template_nome=camp['template'])
 
 
-@bp.route('/admin/info_logistica/enviar', methods=['POST'])
-def admin_info_logistica_enviar():
+@bp.route('/admin/disparo/<chave>/enviar', methods=['POST'])
+def admin_disparo_enviar(chave):
     if not session.get('admin_logged_in'):
         return redirect(url_for('main.admin_login'))
-    incluir_parcial = request.form.get('incluir_parcial') == '1'
-    ids = [i.id for i in destinatarios_logistica(incluir_parcial)]
+    if chave not in CAMPANHAS:
+        return redirect(url_for('main.admin'))
+    camp = CAMPANHAS[chave]
+    criterio = request.form.get('criterio') if request.form.get('criterio') in CRITERIOS else camp['criterio_padrao']
+    ids = [i.id for i in destinatarios_campanha(chave, criterio)]
     if not ids:
-        flash('Nenhum inscrito para receber as informações do jantar.', 'error')
-        return redirect(url_for('main.admin_info_logistica'))
+        flash('Nenhum inscrito para receber esta mensagem.', 'error')
+        return redirect(url_for('main.admin_disparo', chave=chave, criterio=criterio))
 
     from threading import Thread
     app_obj = current_app._get_current_object()
 
     def run_in_background(app):
         with app.app_context():
-            logica_envio_logistica(ids)
+            logica_envio_campanha(chave, ids)
 
     Thread(target=run_in_background, args=(app_obj,)).start()
-    flash(f'Enviando as informações do jantar para {len(ids)} casal(is). Atualize esta página em 1 minuto para ver o andamento.', 'success')
-    return redirect(url_for('main.admin_info_logistica', incluir_parcial='1' if incluir_parcial else None))
+    flash(f"Enviando \"{camp['titulo']}\" para {len(ids)} casal(is). Atualize esta página em 1 minuto para ver o andamento.", 'success')
+    return redirect(url_for('main.admin_disparo', chave=chave, criterio=criterio))
+
+
+@bp.route('/admin/info_logistica')
+def admin_info_logistica():
+    # Endereço antigo: mantém funcionando
+    return redirect(url_for('main.admin_disparo', chave='logistica',
+                            criterio='pago_parcial' if request.args.get('incluir_parcial') == '1' else None))
 
 
 # ---------------------------------------------------------------------------
