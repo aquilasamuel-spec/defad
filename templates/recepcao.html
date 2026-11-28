@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Recepção - Jantar de Casais DEFAD</title>
+    <style>
+        * { box-sizing: border-box; }
+        body { margin: 0; font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; background: #f1f5f9; color: #0f172a; }
+        header { position: sticky; top: 0; z-index: 10; background: linear-gradient(90deg, #10b981, #0d9488); color: #fff; padding: 12px 16px; box-shadow: 0 2px 6px rgba(0,0,0,.15); }
+        .topo { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+        .topo a { color: #fff; font-size: 14px; opacity: .9; }
+        .contador { font-size: 28px; font-weight: 800; margin: 4px 0 8px; }
+        .contador small { font-size: 15px; font-weight: 600; opacity: .85; }
+        input[type=search] { width: 100%; padding: 12px 14px; font-size: 17px; border: 0; border-radius: 10px; outline: none; }
+        .abas { display: flex; gap: 6px; margin-top: 8px; }
+        .abas button { flex: 1; padding: 8px; border: 0; border-radius: 8px; font-size: 14px; font-weight: 600; background: rgba(255,255,255,.2); color: #fff; }
+        .abas button.ativa { background: #fff; color: #0f766e; }
+        main { padding: 12px 16px 40px; max-width: 720px; margin: 0 auto; }
+        .casal { background: #fff; border-radius: 12px; padding: 12px 14px; margin-bottom: 10px; display: flex; align-items: center; gap: 12px; box-shadow: 0 1px 2px rgba(0,0,0,.06); border-left: 5px solid #cbd5e1; }
+        .casal.presente { border-left-color: #10b981; background: #ecfdf5; }
+        .info { flex: 1; min-width: 0; }
+        .nome { font-weight: 700; font-size: 16px; }
+        .conjuge { font-size: 14px; color: #475569; }
+        .meta { font-size: 12px; color: #64748b; margin-top: 4px; display: flex; flex-wrap: wrap; gap: 6px; }
+        .tag { padding: 1px 6px; border-radius: 6px; font-weight: 600; }
+        .pago { background: #dcfce7; color: #166534; }
+        .parcial { background: #fef9c3; color: #854d0e; }
+        .pendente { background: #fee2e2; color: #991b1b; }
+        .hotel { background: #ffedd5; color: #9a3412; }
+        .btn { flex-shrink: 0; min-width: 104px; padding: 12px 10px; font-size: 15px; font-weight: 700; border-radius: 10px; border: 2px solid #10b981; background: #fff; color: #047857; }
+        .presente .btn { background: #10b981; color: #fff; }
+        .btn:disabled { opacity: .5; }
+        .vazio { text-align: center; color: #64748b; padding: 30px 0; }
+        .erro { position: fixed; left: 16px; right: 16px; bottom: 16px; background: #991b1b; color: #fff; padding: 12px; border-radius: 10px; display: none; }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="topo">
+            <strong>Recepção · Jantar de Casais</strong>
+            <a href="{{ url_for('main.admin') }}">Painel →</a>
+        </div>
+        <div class="contador"><span id="presentes">{{ presentes }}</span> <small>de {{ esperados }} casais chegaram</small></div>
+        <input type="search" id="busca" placeholder="Buscar nome ou telefone..." autocomplete="off" oninput="filtrar()">
+        <div class="abas">
+            <button type="button" data-aba="todos" class="ativa" onclick="aba('todos')">Todos</button>
+            <button type="button" data-aba="ausentes" onclick="aba('ausentes')">Não chegaram</button>
+            <button type="button" data-aba="presentes" onclick="aba('presentes')">Chegaram</button>
+        </div>
+    </header>
+
+    <main id="lista">
+        {% for i in casais %}
+        {% set st = status_pagamento(i) %}
+        <div class="casal {{ 'presente' if i.checkin_em }}" id="c{{ i.id }}" data-id="{{ i.id }}"
+             data-busca="{{ (i.nome_completo ~ ' ' ~ i.nome_conjuge)|lower }}" data-tel="{{ i.telefone }}">
+            <div class="info">
+                <div class="nome">{{ i.nome_completo }}</div>
+                <div class="conjuge">& {{ i.nome_conjuge }}</div>
+                <div class="meta">
+                    <span>#{{ i.id }}</span>
+                    <span>{{ i.local_congregacao }}</span>
+                    {% if 'HOTEL' in (i.tipo_inscricao or '')|upper %}<span class="tag hotel">Hotel</span>{% endif %}
+                    <span class="tag {{ st }}">{{ {'pago': 'Pago', 'parcial': 'Pag. parcial', 'pendente': 'Não pagou'}[st] }}</span>
+                </div>
+            </div>
+            <button type="button" class="btn" onclick="marcar({{ i.id }})">{% if i.checkin_em %}✓ {{ i.checkin_em.strftime('%H:%M') }}{% else %}Chegou{% endif %}</button>
+        </div>
+        {% endfor %}
+        <div class="vazio" id="vazio" style="display:none">Nenhum casal encontrado.</div>
+    </main>
+    <div class="erro" id="erro"></div>
+
+    <script>
+        var abaAtual = 'todos';
+
+        function aba(nome) {
+            abaAtual = nome;
+            document.querySelectorAll('.abas button').forEach(function (b) { b.classList.toggle('ativa', b.dataset.aba === nome); });
+            filtrar();
+        }
+
+        function semAcento(t) { return t.normalize('NFD').replace(/[̀-ͯ]/g, ''); }
+
+        function filtrar() {
+            var q = semAcento(document.getElementById('busca').value.trim().toLowerCase());
+            var dig = q.replace(/\D/g, '');
+            var tel8 = dig.length >= 8 ? dig.slice(-8) : (dig.length >= 4 && dig.length === q.replace(/[\s()+\-.]/g, '').length ? dig : null);
+            var visiveis = 0;
+            document.querySelectorAll('.casal').forEach(function (el) {
+                var ok = !q || semAcento(el.dataset.busca).indexOf(q) > -1 || (tel8 && el.dataset.tel.replace(/\D/g, '').indexOf(tel8) > -1);
+                var presente = el.classList.contains('presente');
+                if (abaAtual === 'presentes' && !presente) ok = false;
+                if (abaAtual === 'ausentes' && presente) ok = false;
+                el.style.display = ok ? '' : 'none';
+                if (ok) visiveis++;
+            });
+            document.getElementById('vazio').style.display = visiveis ? 'none' : '';
+        }
+
+        function aplicar(id, hora) {
+            var el = document.getElementById('c' + id);
+            if (!el) return;
+            el.classList.toggle('presente', !!hora);
+            el.querySelector('.btn').innerText = hora ? '✓ ' + hora : 'Chegou';
+        }
+
+        function mostrarErro(msg) {
+            var e = document.getElementById('erro');
+            e.innerText = msg; e.style.display = 'block';
+            setTimeout(function () { e.style.display = 'none'; }, 4000);
+        }
+
+        function marcar(id) {
+            var el = document.getElementById('c' + id);
+            var presente = el.classList.contains('presente');
+            if (presente && !confirm('Desfazer a chegada de ' + el.querySelector('.nome').innerText + '?')) return;
+            var btn = el.querySelector('.btn');
+            btn.disabled = true;
+            fetch('/admin/checkin/' + id, {method: 'POST', headers: {'Content-Type': 'application/json'},
+                                          body: JSON.stringify({acao: presente ? 'desfazer' : 'entrada'})})
+                .then(function (r) { return r.json().then(function (d) { if (!r.ok) throw new Error(d.erro || 'Erro'); return d; }); })
+                .then(function (d) {
+                    aplicar(id, d.hora);
+                    document.getElementById('presentes').innerText = d.presentes;
+                    if (!presente) { document.getElementById('busca').value = ''; }
+                    filtrar();
+                })
+                .catch(function (e) { mostrarErro('Não foi possível salvar: ' + e.message); })
+                .finally(function () { btn.disabled = false; });
+        }
+
+        // Sincroniza com outros aparelhos da recepção a cada 15 segundos
+        setInterval(function () {
+            fetch('/admin/checkin/estado').then(function (r) { return r.ok ? r.json() : null; }).then(function (d) {
+                if (!d) return;
+                document.querySelectorAll('.casal').forEach(function (el) { aplicar(el.dataset.id, d.checkins[el.dataset.id] || null); });
+                document.getElementById('presentes').innerText = d.presentes;
+                filtrar();
+            }).catch(function () {});
+        }, 15000);
+    </script>
+</body>
+</html>

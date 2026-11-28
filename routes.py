@@ -373,6 +373,8 @@ def admin():
                            qtd_pago_parcial=sum(1 for i in inscricoes if i.pagou_alguma_parcela and not all(p.status_parcela == 'Pago' for p in i.parcelas)),
                            total_para_confirmar=len(inscricoes_para_confirmar()),
                            congregacoes=lista_congregacoes(inscricoes),
+                           checkin_presentes=sum(1 for i in inscricoes if i.checkin_em and not i.sinalizada_exclusao),
+                           checkin_esperados=sum(1 for i in inscricoes if not i.sinalizada_exclusao),
                            total_sinalizadas=sum(1 for i in inscricoes if i.sinalizada_exclusao),
                            evento_nome=EVENTO_NOME,
                            evento_data=EVENTO_DATA,
@@ -943,6 +945,62 @@ def admin_info_logistica_enviar():
     Thread(target=run_in_background, args=(app_obj,)).start()
     flash(f'Enviando as informações do jantar para {len(ids)} casal(is). Atualize esta página em 1 minuto para ver o andamento.', 'success')
     return redirect(url_for('main.admin_info_logistica', incluir_parcial='1' if incluir_parcial else None))
+
+
+# ---------------------------------------------------------------------------
+# CHECK-IN NA CHEGADA AO EVENTO
+# ---------------------------------------------------------------------------
+def inscricoes_esperadas():
+    """Casais esperados no evento: todos, menos quem respondeu que não vai."""
+    return [i for i in Inscricao.query.all() if not i.sinalizada_exclusao]
+
+
+def resumo_checkin():
+    esperadas = inscricoes_esperadas()
+    return {'presentes': sum(1 for i in esperadas if i.checkin_em), 'esperados': len(esperadas)}
+
+
+@bp.route('/admin/checkin/<int:id>', methods=['POST'])
+def admin_checkin(id):
+    from flask import jsonify
+    if not session.get('admin_logged_in'):
+        return jsonify({'erro': 'Sessão expirada. Faça login novamente.'}), 401
+    inscricao = Inscricao.query.get_or_404(id)
+    # Sem "acao", alterna; com acao=entrada/desfazer, aplica (evita desmarcar sem querer com 2 aparelhos)
+    acao = (request.get_json(silent=True) or {}).get('acao') or request.form.get('acao')
+    if acao == 'entrada' or (acao is None and not inscricao.checkin_em):
+        if not inscricao.checkin_em:
+            inscricao.checkin_em = datetime.now()
+    else:
+        inscricao.checkin_em = None
+    db.session.commit()
+    return jsonify({
+        'id': inscricao.id,
+        'presente': bool(inscricao.checkin_em),
+        'hora': inscricao.checkin_em.strftime('%H:%M') if inscricao.checkin_em else None,
+        **resumo_checkin(),
+    })
+
+
+@bp.route('/admin/checkin/estado')
+def admin_checkin_estado():
+    """Estado atual de todos os check-ins (para sincronizar vários aparelhos na recepção)."""
+    from flask import jsonify
+    if not session.get('admin_logged_in'):
+        return jsonify({'erro': 'Sessão expirada. Faça login novamente.'}), 401
+    return jsonify({
+        'checkins': {str(i.id): i.checkin_em.strftime('%H:%M') for i in Inscricao.query.filter(Inscricao.checkin_em.isnot(None)).all()},
+        **resumo_checkin(),
+    })
+
+
+@bp.route('/admin/recepcao')
+def admin_recepcao():
+    """Tela leve para a recepção (celular): busca por nome/telefone e botão de chegada."""
+    if not session.get('admin_logged_in'):
+        return redirect(url_for('main.admin_login'))
+    casais = sorted(inscricoes_esperadas(), key=lambda i: (i.nome_completo or '').strip().upper())
+    return render_template('recepcao.html', casais=casais, status_pagamento=status_pagamento, **resumo_checkin())
 
 
 @bp.route('/admin/exportar_pdf')

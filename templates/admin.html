@@ -109,6 +109,20 @@
             </div>
         </div>
 
+        <!-- PRESENÇA NO EVENTO (CHECK-IN) -->
+        <div class="mb-8 rounded-2xl shadow-md p-6 bg-gradient-to-r from-emerald-500 to-teal-600 text-white flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div>
+                <p class="text-sm font-semibold uppercase text-white/80">Presença no evento (check-in)</p>
+                <p class="text-4xl font-extrabold mt-1"><span id="checkinPresentes">{{ checkin_presentes }}</span> <span class="text-2xl font-semibold text-white/80">de {{ checkin_esperados }} casais</span></p>
+                <p class="text-xs text-white/70 mt-1">Não conta quem respondeu que não vai.</p>
+            </div>
+            <div class="flex flex-wrap gap-2">
+                <button type="button" onclick="filtrarCheckin('ausentes')" class="bg-white/15 hover:bg-white/25 px-4 py-2 rounded-lg text-sm font-semibold">Ver quem não chegou</button>
+                <button type="button" onclick="filtrarCheckin('presentes')" class="bg-white/15 hover:bg-white/25 px-4 py-2 rounded-lg text-sm font-semibold">Ver quem chegou</button>
+                <a href="{{ url_for('main.admin_recepcao') }}" class="bg-white text-teal-700 hover:bg-teal-50 px-4 py-2 rounded-lg text-sm font-bold">📱 Modo Recepção</a>
+            </div>
+        </div>
+
         <!-- SITUAÇÃO DE PAGAMENTO DOS INSCRITOS -->
         <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
             <div class="bg-white rounded-2xl shadow-sm border border-red-100 p-6">
@@ -263,6 +277,10 @@
         <div class="flex flex-col sm:flex-row sm:justify-between sm:items-end gap-4 mb-6">
             <div>
                 <h2 id="tituloInscritos" class="text-2xl font-bold text-gray-900">👥 Inscritos Recentes</h2>
+                <div id="avisoFiltroCheckin" class="hidden mt-2 inline-flex items-center gap-3 px-3 py-1 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-800 text-sm font-semibold">
+                    <span id="avisoFiltroCheckinTexto"></span>
+                    <button type="button" onclick="limparFiltroCheckin()" class="underline hover:text-emerald-900">Mostrar todos</button>
+                </div>
                 <div id="avisoFiltroSinalizadas" class="hidden mt-2 inline-flex items-center gap-3 px-3 py-1 rounded-lg bg-red-50 border border-red-200 text-red-800 text-sm font-semibold">
                     Mostrando só quem respondeu "Não" (sinalizados para retirada)
                     <button type="button" onclick="limparFiltroSinalizadas()" class="underline hover:text-red-900">Mostrar todos</button>
@@ -313,10 +331,16 @@
                     </thead>
                     <tbody class="bg-white divide-y divide-gray-200">
                         {% for i in inscricoes %}
-                        <tr data-telefone="{{ i.telefone }}" data-sinalizada="{{ 1 if i.sinalizada_exclusao else 0 }}" class="{% if i.sinalizada_exclusao %}bg-red-50 {% endif %}hover:bg-gray-50 transition">
+                        <tr data-telefone="{{ i.telefone }}" data-sinalizada="{{ 1 if i.sinalizada_exclusao else 0 }}" data-checkin="{{ 1 if i.checkin_em else 0 }}" id="linha_{{ i.id }}" class="{% if i.sinalizada_exclusao %}bg-red-50 {% endif %}hover:bg-gray-50 transition">
                             <td class="px-6 py-4 whitespace-nowrap">
                                 <div class="text-sm font-bold text-gray-900">#{{ i.id }}</div>
                                 <div class="text-xs text-gray-500">{{ i.data_inscricao.strftime('%d/%m/%Y %H:%M') }}</div>
+                                {% if not i.sinalizada_exclusao %}
+                                <button type="button" id="checkin_btn_{{ i.id }}" onclick="toggleCheckin({{ i.id }})"
+                                        class="checkin-btn mt-3 w-full inline-flex items-center justify-center gap-1 px-3 py-2 rounded-lg text-xs font-bold border transition {{ 'bg-emerald-600 border-emerald-600 text-white' if i.checkin_em else 'bg-white border-emerald-300 text-emerald-700 hover:bg-emerald-50' }}">
+                                    {% if i.checkin_em %}✓ Chegou {{ i.checkin_em.strftime('%H:%M') }}{% else %}Marcar chegada{% endif %}
+                                </button>
+                                {% endif %}
                             </td>
                             <td class="px-6 py-4">
                                 <div class="text-sm font-bold text-gray-900">{{ i.nome_completo }}</div>
@@ -645,10 +669,56 @@
             }
         }
 
+        var filtroCheckin = null; // null | 'presentes' | 'ausentes'
+
+        function filtrarCheckin(modo) {
+            filtroCheckin = modo;
+            somenteSinalizadas = false;
+            document.getElementById("avisoFiltroSinalizadas").classList.add("hidden");
+            var aviso = document.getElementById("avisoFiltroCheckin");
+            aviso.classList.remove("hidden");
+            document.getElementById("avisoFiltroCheckinTexto").innerText = modo === 'presentes' ? 'Mostrando só quem já chegou' : 'Mostrando só quem ainda não chegou';
+            filterTable();
+            document.getElementById("tituloInscritos").scrollIntoView({behavior: "smooth", block: "start"});
+        }
+
+        function limparFiltroCheckin() {
+            filtroCheckin = null;
+            document.getElementById("avisoFiltroCheckin").classList.add("hidden");
+            filterTable();
+        }
+
+        function pintarBotaoCheckin(btn, presente, hora) {
+            btn.className = 'checkin-btn mt-3 w-full inline-flex items-center justify-center gap-1 px-3 py-2 rounded-lg text-xs font-bold border transition ' +
+                (presente ? 'bg-emerald-600 border-emerald-600 text-white' : 'bg-white border-emerald-300 text-emerald-700 hover:bg-emerald-50');
+            btn.innerText = presente ? '✓ Chegou ' + hora : 'Marcar chegada';
+        }
+
+        function toggleCheckin(id) {
+            var btn = document.getElementById('checkin_btn_' + id);
+            var linha = document.getElementById('linha_' + id);
+            var presente = linha.getAttribute('data-checkin') === '1';
+            if (presente && !confirm('Desfazer a chegada deste casal?')) return;
+            btn.disabled = true;
+            fetch('/admin/checkin/' + id, {method: 'POST', headers: {'Content-Type': 'application/json'},
+                                          body: JSON.stringify({acao: presente ? 'desfazer' : 'entrada'})})
+                .then(function (r) { return r.json().then(function (d) { if (!r.ok) throw new Error(d.erro || 'Erro'); return d; }); })
+                .then(function (d) {
+                    linha.setAttribute('data-checkin', d.presente ? '1' : '0');
+                    pintarBotaoCheckin(btn, d.presente, d.hora);
+                    document.getElementById('checkinPresentes').innerText = d.presentes;
+                    if (filtroCheckin) filterTable();
+                })
+                .catch(function (e) { alert('Não foi possível salvar: ' + e.message); })
+                .finally(function () { btn.disabled = false; });
+        }
+
         var somenteSinalizadas = false;
 
         function filtrarSinalizadas() {
             somenteSinalizadas = true;
+            filtroCheckin = null;
+            document.getElementById("avisoFiltroCheckin").classList.add("hidden");
             document.getElementById("searchInput").value = "";
             document.getElementById("avisoFiltroSinalizadas").classList.remove("hidden");
             filterTable();
@@ -676,6 +746,10 @@
                 var tel = (tr[i].getAttribute("data-telefone") || "").replace(/\D/g, "");
                 var achou = texto.indexOf(filter) > -1 || (buscaTelefone && tel.indexOf(buscaTelefone) > -1);
                 if (somenteSinalizadas && tr[i].getAttribute("data-sinalizada") !== "1") achou = false;
+                if (filtroCheckin) {
+                    var chegou = tr[i].getAttribute("data-checkin") === "1";
+                    if (tr[i].getAttribute("data-sinalizada") === "1" || (filtroCheckin === 'presentes') !== chegou) achou = false;
+                }
                 tr[i].style.display = achou ? "" : "none";
             }
         }
